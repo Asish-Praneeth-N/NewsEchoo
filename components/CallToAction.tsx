@@ -34,7 +34,7 @@ export default function CallToAction() {
           </h2>
           
           <p className="font-inter text-xl text-white/90 leading-relaxed max-w-2xl mx-auto">
-            Don't miss out on the insights that matter. Subscribe now and get your first 
+            Don&rsquo;t miss out on the insights that matter. Subscribe now and get your first 
             curated newsletter within 24 hours.
           </p>
 

@@ -81,7 +81,7 @@ export default function Testimonials() {
             What Our Readers Say
           </h2>
           <p className="font-inter text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-            Don't just take our word for it. Here's what our community has to say about NewsEcho.
+            Don&rsquo;t just take our word for it. Here&rsquo;s what our community has to say about NewsEcho.
           </p>
         </motion.div>
 
