@@ -1,99 +1,86 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
-import { auth, googleProvider } from '@/lib/firebase';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useAuth } from '@/context/AuthContext';
-import { Loader2 } from 'lucide-react';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
+import { toast } from 'sonner';
+import { motion } from 'framer-motion';
+import Link from 'next/link';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const { user, role, loading } = useAuth();
 
-  useEffect(() => {
-    if (!loading && user && role && user.emailVerified) {
-      router.push(role === 'admin' ? '/admin' : '/user-dashboard');
-    } else if (user && !user.emailVerified) {
-      setError('Please verify your email before logging in.');
-      auth.signOut();
-    }
-  }, [user, role, loading, router]);
-
-  if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-black dark:text-gray-400" /></div>;
-  if (user && role && user.emailVerified) return null;
-
-  const handleEmailLogin = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setIsLoggingIn(true);
+    setLoading(true);
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      await userCredential.user.reload();
-      if (!userCredential.user.emailVerified) {
-        await auth.signOut();
-        setError('Please verify your email before logging in.');
-        setIsLoggingIn(false);
-        return;
-      }
-      setIsLoggingIn(false);
+      await signInWithEmailAndPassword(auth, email, password);
+      toast.success('Logged in successfully!');
       router.push('/user-dashboard');
-    } catch (err: any) {
-      console.error('Login error:', err.code, err.message);
-      setError(err.message);
-      setIsLoggingIn(false);
-    }
-  };
-
-  const handleGoogleLogin = async () => {
-    setError('');
-    setIsLoggingIn(true);
-    try {
-      await signInWithPopup(auth, googleProvider);
-      setIsLoggingIn(false);
-      router.push('/user-dashboard');
-    } catch (err: any) {
-      console.error('Google login error:', err.code, err.message);
-      setError(err.message);
-      setIsLoggingIn(false);
+    } catch (err: unknown) {
+      const error = err instanceof Error ? err : new Error('Unknown error');
+      toast.error(`Failed to log in: ${error.message}`);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="text-2xl font-playfair">Login to NewsEcho</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {error && <p className="text-red-500 mb-4">{error}</p>}
-          <form onSubmit={handleEmailLogin} className="space-y-4">
-            <Input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
-            <Input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} />
-            <Button type="submit" className="w-full bg-black text-white dark:bg-gray-400" disabled={isLoggingIn}>
-              {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : 'Login'}
-            </Button>
-          </form>
-          <div className="my-4 text-center text-gray-600 dark:text-gray-300">OR</div>
-          <Button
-            onClick={handleGoogleLogin}
-            className="w-full bg-white text-black border border-gray-300 dark:bg-gray-800 dark:text-white"
-            disabled={isLoggingIn}
+    <section className="min-h-screen flex items-center justify-center bg-white dark:bg-black">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="max-w-md w-full mx-4 p-8 bg-white dark:bg-gray-800 rounded-xl shadow-lg"
+      >
+        <h2 className="text-3xl font-playfair font-bold text-black dark:text-white mb-6 text-center">
+          Log In
+        </h2>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Email
+            </label>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="mt-1 w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-black dark:text-white focus:ring-2 focus:ring-gray-400"
+              required
+            />
+          </div>
+          <div>
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Password
+            </label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="mt-1 w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-black dark:text-white focus:ring-2 focus:ring-gray-400"
+              required
+            />
+          </div>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            type="submit"
+            disabled={loading}
+            className="w-full py-3 px-4 bg-black dark:bg-gray-400 text-white rounded-lg font-medium transition-all duration-300"
           >
-            {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : 'Sign in with Google'}
-          </Button>
-          <p className="mt-4 text-center text-sm">
-            Don&apos;t have an account? <a href="/signup" className="text-blue-500 hover:underline">Sign Up</a>
-          </p>
-        </CardContent>
-      </Card>
-    </div>
+            {loading ? 'Logging in...' : 'Log In'}
+          </motion.button>
+        </form>
+        <p className="mt-4 text-center text-sm text-gray-600 dark:text-gray-300">
+          Don&apos;t have an account? <Link href="/signup" className="text-blue-500 hover:underline">Sign Up</Link>
+        </p>
+      </motion.div>
+    </section>
   );
 }
