@@ -43,8 +43,9 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     try {
       await signOut(auth);
       router.push('/login');
-    } catch (err: any) {
-      setSignOutError('Failed to sign out: ' + err.message);
+    } catch (err: unknown) {
+      const error = err instanceof Error ? err : new Error('Unknown error');
+      setSignOutError(`Failed to sign out: ${error.message}`);
     }
   };
 
