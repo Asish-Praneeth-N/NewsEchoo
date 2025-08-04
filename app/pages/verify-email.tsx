@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { applyActionCode, getAuth } from 'firebase/auth';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
-import Link from 'next/link'; 
+import Link from 'next/link';
 
 export default function VerifyEmail() {
   const [error, setError] = useState('');
