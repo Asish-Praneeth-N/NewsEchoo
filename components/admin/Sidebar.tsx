@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { signOut } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import { 
   LayoutDashboard, 
   PenTool, 
@@ -18,6 +19,7 @@ import {
   X,
   Mail
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -29,23 +31,42 @@ const navigation = [
   { name: 'Create Newsletter', href: '/admin/create', icon: PenTool },
   { name: 'Manage Newsletters', href: '/admin/newsletters', icon: FileText },
   { name: 'User List', href: '/admin/users', icon: Users },
-  { name: 'Replies', href: '/admin/replies', icon: MessageSquare, badge: 12 },
+  { name: 'Replies', href: '/admin/replies', icon: MessageSquare },
   { name: 'Settings', href: '/admin/settings', icon: Settings },
 ];
 
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, role } = useAuth();
+  const [unreadCount, setUnreadCount] = useState(0);
   const [signOutError, setSignOutError] = useState('');
+
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      if (!user || role !== 'admin') return;
+      try {
+        const repliesQuery = query(collection(db, 'replies'), where('read', '==', false));
+        const snapshot = await getDocs(repliesQuery);
+        setUnreadCount(snapshot.size);
+      } catch (err: unknown) {
+        console.error('Sidebar: Failed to fetch unread count:', err);
+      }
+    };
+    if (user && role === 'admin') {
+      fetchUnreadCount();
+    }
+  }, [user, role]);
 
   const handleSignOut = async () => {
     try {
       await signOut(auth);
+      toast.success('Logged out successfully');
       router.push('/login');
     } catch (err: unknown) {
       const error = err instanceof Error ? err : new Error('Unknown error');
       setSignOutError(`Failed to sign out: ${error.message}`);
+      toast.error(`Failed to sign out: ${error.message}`);
     }
   };
 
@@ -56,7 +77,6 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       transition={{ type: 'spring', damping: 25, stiffness: 200 }}
       className="fixed lg:sticky top-0 left-0 min-h-screen w-72 flex-col bg-white dark:bg-black shadow-xl lg:shadow-lg z-50 border-2 border-black dark:border-white"
     >
-      {/* Header */}
       <div className="flex items-center justify-between p-6 border-b border-gray-300 dark:border-gray-600">
         <div className="flex items-center space-x-3">
           <div className="flex items-center justify-center w-10 h-10 bg-black dark:bg-white rounded-xl">
@@ -75,7 +95,6 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         </button>
       </div>
 
-      {/* Navigation */}
       <nav className="flex-1 px-4 py-6 space-y-2">
         {navigation.map((item) => {
           const isActive = pathname === item.href;
@@ -95,9 +114,9 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                 }`}
               />
               <span className="flex-1">{item.name}</span>
-              {item.badge && (
+              {item.name === 'Replies' && unreadCount > 0 && (
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
-                  {item.badge}
+                  {unreadCount}
                 </span>
               )}
             </Link>
@@ -105,7 +124,6 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         })}
       </nav>
 
-      {/* Footer */}
       <div className="p-4 border-t border-gray-300 dark:border-gray-600">
         {signOutError && <p className="text-gray-600 dark:text-gray-300 text-xs mb-2">{signOutError}</p>}
         <div className="flex items-center space-x-3 p-3 bg-gray-100 dark:bg-gray-800 rounded-xl">

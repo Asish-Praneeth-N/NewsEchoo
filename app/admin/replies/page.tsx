@@ -3,11 +3,11 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import AdminLayout from '@/components/admin/AdminLayout';
-import { Search, Filter, Calendar, MessageSquare, Send } from 'lucide-react';
+import { Search, Calendar, MessageSquare, Send } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, query, updateDoc, doc, addDoc, Timestamp } from 'firebase/firestore';
 import { toast } from 'sonner';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/context/AuthContext';
 
 interface Reply {
   id: string;
@@ -29,10 +29,11 @@ export default function RepliesPage() {
   const [loading, setLoading] = useState(true);
   const [replyForm, setReplyForm] = useState<{ [key: string]: string }>({});
   const [showReplyForm, setShowReplyForm] = useState<{ [key: string]: boolean }>({});
-  const { user, loading: authLoading } = useAuth();
+  const { user, role, loading: authLoading } = useAuth();
 
   useEffect(() => {
     const fetchReplies = async () => {
+      if (!user || role !== 'admin') return;
       setLoading(true);
       try {
         const repliesQuery = query(collection(db, 'replies'));
@@ -43,7 +44,7 @@ export default function RepliesPage() {
             id: doc.id,
             newsletterId: data.newsletterId || 'Unknown',
             newsletterTitle: data.newsletterTitle || 'Unknown',
-            userName: data.userName || 'Unknown',
+            userName: data.senderName || 'Unknown',
             userEmail: data.userEmail || 'Unknown',
             message: data.message || '',
             timestamp: data.timestamp?.toDate().toISOString() || new Date().toISOString(),
@@ -60,10 +61,10 @@ export default function RepliesPage() {
         setLoading(false);
       }
     };
-    if (!authLoading) {
+    if (!authLoading && user && role === 'admin') {
       fetchReplies();
     }
-  }, [authLoading]);
+  }, [authLoading, user, role]);
 
   const handleMarkAsRead = async (replyId: string) => {
     try {
@@ -115,7 +116,7 @@ export default function RepliesPage() {
           id: doc.id,
           newsletterId: data.newsletterId || 'Unknown',
           newsletterTitle: data.newsletterTitle || 'Unknown',
-          userName: data.userName || 'Unknown',
+          userName: data.senderName || 'Unknown',
           userEmail: data.userEmail || 'Unknown',
           message: data.message || '',
           timestamp: data.timestamp?.toDate().toISOString() || new Date().toISOString(),
@@ -158,21 +159,15 @@ export default function RepliesPage() {
   if (loading || authLoading) {
     return (
       <AdminLayout>
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="w-8 h-8 border-2 border-sky-600 border-t-transparent rounded-full animate-spin" />
+        <div className="min-h-screen flex items-center justify-center bg-white dark:bg-black">
+          <div className="w-8 h-8 border-2 border-sky-600 dark:border-sky-400 border-t-transparent rounded-full animate-spin" />
         </div>
       </AdminLayout>
     );
   }
 
-  if (!user) {
-    return (
-      <AdminLayout>
-        <div className="min-h-screen flex items-center justify-center">
-          <p className="text-slate-600">Please log in to view replies.</p>
-        </div>
-      </AdminLayout>
-    );
+  if (!user || role !== 'admin') {
+    return null; // AdminLayout handles redirect
   }
 
   return (
@@ -185,15 +180,15 @@ export default function RepliesPage() {
           className="flex items-center justify-between"
         >
           <div>
-            <h1 className="text-3xl font-playfair font-bold text-slate-900">
+            <h1 className="text-3xl font-playfair font-bold text-slate-900 dark:text-slate-100">
               Replies
               {unreadCount > 0 && (
-                <span className="ml-3 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-sky-100 text-sky-800">
+                <span className="ml-3 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
                   {unreadCount} unread
                 </span>
               )}
             </h1>
-            <p className="mt-2 text-slate-600">Manage and respond to subscriber feedback.</p>
+            <p className="mt-2 text-slate-600 dark:text-slate-300">Manage and respond to subscriber feedback.</p>
           </div>
         </motion.div>
 
@@ -203,15 +198,15 @@ export default function RepliesPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"
+            className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-200/50 dark:border-gray-700/50"
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-slate-500">Total Replies</p>
-                <p className="text-3xl font-bold text-slate-900">{replies.length}</p>
+                <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Total Replies</p>
+                <p className="text-3xl font-playfair font-bold text-slate-900 dark:text-slate-100">{replies.length}</p>
               </div>
-              <div className="p-3 bg-sky-50 rounded-xl">
-                <MessageSquare className="w-6 h-6 text-sky-600" />
+              <div className="p-3 bg-sky-50 dark:bg-sky-900/50 rounded-xl">
+                <MessageSquare className="w-6 h-6 text-sky-600 dark:text-sky-400" />
               </div>
             </div>
           </motion.div>
@@ -220,15 +215,15 @@ export default function RepliesPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"
+            className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-200/50 dark:border-gray-700/50"
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-slate-500">Unread</p>
-                <p className="text-3xl font-bold text-slate-900">{unreadCount}</p>
+                <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Unread</p>
+                <p className="text-3xl font-playfair font-bold text-slate-900 dark:text-slate-100">{unreadCount}</p>
               </div>
-              <div className="p-3 bg-amber-50 rounded-xl">
-                <MessageSquare className="w-6 h-6 text-amber-600" />
+              <div className="p-3 bg-amber-50 dark:bg-amber-900/50 rounded-xl">
+                <MessageSquare className="w-6 h-6 text-amber-600 dark:text-amber-400" />
               </div>
             </div>
           </motion.div>
@@ -237,15 +232,15 @@ export default function RepliesPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
-            className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"
+            className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-200/50 dark:border-gray-700/50"
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-slate-500">This Week</p>
-                <p className="text-3xl font-bold text-slate-900">{repliesThisWeek}</p>
+                <p className="text-sm font-medium text-slate-500 dark:text-slate-400">This Week</p>
+                <p className="text-3xl font-playfair font-bold text-slate-900 dark:text-slate-100">{repliesThisWeek}</p>
               </div>
-              <div className="p-3 bg-emerald-50 rounded-xl">
-                <Calendar className="w-6 h-6 text-emerald-600" />
+              <div className="p-3 bg-emerald-50 dark:bg-emerald-900/50 rounded-xl">
+                <Calendar className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
               </div>
             </div>
           </motion.div>
@@ -256,18 +251,18 @@ export default function RepliesPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
-          className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"
+          className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-200/50 dark:border-gray-700/50"
         >
           <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between space-y-4 lg:space-y-0 lg:space-x-4">
             <div className="flex-1 max-w-md">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
                 <input
                   type="text"
                   placeholder="Search replies..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-colors"
+                  className="w-full pl-10 pr-4 py-3 border border-gray-200/50 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-blue-500 dark:focus:border-blue-400 transition-colors bg-white dark:bg-gray-700 text-slate-900 dark:text-slate-100"
                 />
               </div>
             </div>
@@ -275,7 +270,7 @@ export default function RepliesPage() {
               <select
                 value={selectedNewsletter}
                 onChange={(e) => setSelectedNewsletter(e.target.value)}
-                className="px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-colors"
+                className="px-4 py-3 border border-gray-200/50 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-blue-500 dark:focus:border-blue-400 transition-colors bg-white dark:bg-gray-700 text-slate-900 dark:text-slate-100"
               >
                 <option value="all">All Newsletters</option>
                 {newsletters.map(newsletter => (
@@ -287,7 +282,7 @@ export default function RepliesPage() {
               <select
                 value={filter}
                 onChange={(e) => setFilter(e.target.value as 'all' | 'read' | 'unread')}
-                className="px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-colors"
+                className="px-4 py-3 border border-gray-200/50 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-blue-500 dark:focus:border-blue-400 transition-colors bg-white dark:bg-gray-700 text-slate-900 dark:text-slate-100"
               >
                 <option value="all">All Replies</option>
                 <option value="unread">Unread</option>
@@ -305,48 +300,48 @@ export default function RepliesPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5 + index * 0.05 }}
-              className={`bg-white rounded-2xl shadow-sm border transition-all duration-300 hover:shadow-md ${
-                reply.read ? 'border-slate-200' : 'border-sky-200 bg-sky-50/30'
+              className={`bg-white dark:bg-gray-800 rounded-2xl shadow-sm border transition-all duration-300 hover:shadow-md ${
+                reply.read ? 'border-gray-200/50 dark:border-gray-700/50' : 'border-blue-200 dark:border-blue-900/50 bg-blue-50/30 dark:bg-blue-900/30'
               }`}
             >
               <div className="p-6">
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-start space-x-4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-sky-400 to-sky-600 rounded-full flex items-center justify-center">
+                    <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center">
                       <span className="text-white font-medium">
                         {reply.userName.split(' ').map(n => n[0]).join('')}
                       </span>
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center space-x-2 mb-1">
-                        <h3 className="font-semibold text-slate-900">{reply.userName}</h3>
+                        <h3 className="font-semibold text-slate-900 dark:text-slate-100">{reply.userName}</h3>
                         {!reply.read && (
-                          <span className="w-2 h-2 bg-sky-500 rounded-full"></span>
+                          <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
                         )}
                       </div>
-                      <p className="text-sm text-slate-500 mb-2">{reply.userEmail}</p>
-                      <p className="text-sm text-sky-600 font-medium">
+                      <p className="text-sm text-slate-500 dark:text-slate-400">{reply.userEmail}</p>
+                      <p className="text-sm text-blue-600 dark:text-blue-400 font-medium">
                         Re: {reply.newsletterTitle}
                       </p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm text-slate-500">
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
                       {new Date(reply.timestamp).toLocaleDateString()}
                     </p>
-                    <p className="text-xs text-slate-400">
+                    <p className="text-xs text-slate-400 dark:text-slate-500">
                       {new Date(reply.timestamp).toLocaleTimeString()}
                     </p>
                   </div>
                 </div>
-                <div className="bg-slate-50 rounded-xl p-4">
-                  <p className="text-slate-700 leading-relaxed">{reply.message}</p>
+                <div className="bg-gray-50 dark:bg-gray-700 rounded-xl p-4">
+                  <p className="text-slate-700 dark:text-slate-300 leading-relaxed">{reply.message}</p>
                 </div>
-                <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-200">
+                <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200/50 dark:border-gray-700/50">
                   <div className="flex items-center space-x-2">
                     <button
                       onClick={() => setShowReplyForm({ ...showReplyForm, [reply.id]: !showReplyForm[reply.id] })}
-                      className="text-sm text-sky-600 hover:text-sky-700 font-medium transition-colors"
+                      className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium transition-colors"
                     >
                       {showReplyForm[reply.id] ? 'Cancel' : 'Reply'}
                     </button>
@@ -354,24 +349,24 @@ export default function RepliesPage() {
                   {!reply.read && (
                     <button
                       onClick={() => handleMarkAsRead(reply.id)}
-                      className="text-sm text-slate-500 hover:text-slate-700 transition-colors"
+                      className="text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
                     >
                       Mark as read
                     </button>
                   )}
                 </div>
                 {showReplyForm[reply.id] && (
-                  <div className="mt-4 p-4 bg-slate-100 rounded-xl">
+                  <div className="mt-4 p-4 bg-gray-100 dark:bg-gray-700 rounded-xl">
                     <textarea
                       value={replyForm[reply.id] || ''}
                       onChange={(e) => setReplyForm({ ...replyForm, [reply.id]: e.target.value })}
                       placeholder="Type your reply here..."
-                      className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-colors"
+                      className="w-full p-3 border border-gray-200/50 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-blue-500 dark:focus:border-blue-400 transition-colors bg-white dark:bg-gray-700 text-slate-900 dark:text-slate-100"
                       rows={4}
                     />
                     <button
                       onClick={() => handleSendReply(reply.id)}
-                      className="mt-2 flex items-center px-4 py-2 bg-sky-600 text-white rounded-xl hover:bg-sky-700 transition-colors shadow-sm hover:shadow-md"
+                      className="mt-2 flex items-center px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 dark:hover:bg-blue-500 transition-colors shadow-sm hover:shadow-md"
                     >
                       <Send className="w-4 h-4 mr-2" />
                       Send Reply
@@ -390,11 +385,11 @@ export default function RepliesPage() {
             animate={{ opacity: 1, y: 0 }}
             className="text-center py-12"
           >
-            <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <MessageSquare className="w-8 h-8 text-slate-400" />
+            <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+              <MessageSquare className="w-8 h-8 text-slate-400 dark:text-slate-500" />
             </div>
-            <h3 className="text-lg font-medium text-slate-900 mb-2">No replies found</h3>
-            <p className="text-slate-500">Try adjusting your search or filter criteria.</p>
+            <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">No replies found</h3>
+            <p className="text-slate-500 dark:text-slate-400">Try adjusting your search or filter criteria.</p>
           </motion.div>
         )}
       </div>
