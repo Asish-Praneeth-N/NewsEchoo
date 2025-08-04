@@ -1,13 +1,13 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { signOut } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
-import { useAuth } from '@/context/AuthContext';
-import Sidebar from './Sidebar';
-import { Menu } from 'lucide-react';
-import { toast } from 'sonner';
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { signOut } from "firebase/auth";
+import { auth } from "@/lib/firebase";
+import { useAuth } from "@/context/AuthContext";
+import Sidebar from "./Sidebar";
+import { Menu } from "lucide-react";
+import { toast } from "sonner";
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -16,23 +16,26 @@ interface AdminLayoutProps {
 export default function AdminLayout({ children }: AdminLayoutProps) {
   const { user, role, loading } = useAuth();
   const router = useRouter();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true); // Changed to true for testing
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   useEffect(() => {
-    console.log('AdminLayout: loading=', loading, 'user=', user, 'role=', role);
-    if (!loading && (!user || role !== 'admin' || !user.emailVerified)) {
-      console.log('AdminLayout: Redirecting to /login');
-      toast.error('You must be an admin to access this page.');
-      router.push('/login');
+    console.log("AdminLayout: loading=", loading, "user=", user, "role=", role);
+    if (!loading && (!user || role !== "admin" || !user.emailVerified)) {
+      console.log("AdminLayout: Redirecting to /login");
+      toast.error("You must be an admin to access this page.");
+      router.push("/login");
     }
   }, [user, role, loading, router]);
 
   const handleSignOut = async () => {
     try {
       await signOut(auth);
-      router.push('/login');
-    } catch (err: any) {
-      toast.error('Failed to sign out: ' + err.message);
+      router.push("/login");
+    } catch (err: unknown) {
+      toast.error(
+        "Failed to sign out: " +
+          (err instanceof Error ? err.message : "Unknown error")
+      );
     }
   };
 
@@ -44,8 +47,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     );
   }
 
-  if (!user || role !== 'admin' || !user.emailVerified) {
-    console.log('AdminLayout: Not rendering due to auth check');
+  if (!user || role !== "admin" || !user.emailVerified) {
+    console.log("AdminLayout: Not rendering due to auth check");
     return null;
   }
 
@@ -56,7 +59,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         <div className="lg:hidden flex items-center justify-between mb-4">
           <button
             onClick={() => {
-              console.log('Toggling sidebar: ', !isSidebarOpen);
+              console.log("Toggling sidebar: ", !isSidebarOpen);
               setIsSidebarOpen(true);
             }}
             className="p-2 bg-black dark:bg-white text-white dark:text-black rounded-lg border-2 border-black dark:border-white"

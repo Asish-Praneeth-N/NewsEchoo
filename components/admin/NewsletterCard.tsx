@@ -1,5 +1,8 @@
+'use client';
+
 import { motion } from 'framer-motion';
 import { Calendar, MessageSquare } from 'lucide-react';
+import Image from 'next/image';
 
 interface NewsletterCardProps {
   title: string;
@@ -17,7 +20,15 @@ export default function NewsletterCard({ title, status, date, replies, imageUrl,
       onClick={onClick}
       className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-300 dark:border-gray-600 p-4 flex items-center space-x-4 cursor-pointer"
     >
-      {imageUrl && <img src={imageUrl} alt={title} className="w-16 h-16 rounded-lg object-cover" />}
+      {imageUrl && (
+        <Image
+          src={imageUrl}
+          alt={title}
+          width={64}
+          height={64}
+          className="w-16 h-16 rounded-lg object-cover"
+        />
+      )}
       <div className="flex-1">
         <h3 className="text-lg font-medium text-black dark:text-white">{title}</h3>
         <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-300 mt-1">

@@ -3,36 +3,37 @@
 import { motion } from 'framer-motion';
 import { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Quote } from 'lucide-react';
+import Image from 'next/image';
 
 const testimonials = [
   {
     id: 1,
-    name: "Sarah Chen",
-    role: "Product Manager at TechCorp",
-    content: "NewsEcho has completely transformed how I stay informed. The quality of content is exceptional, and the curation saves me hours every week.",
-    avatar: "https://images.pexels.com/photos/3769021/pexels-photo-3769021.jpeg?auto=compress&cs=tinysrgb&w=150"
+    name: 'Sarah Chen',
+    role: 'Product Manager at TechCorp',
+    content: 'NewsEcho has completely transformed how I stay informed. The quality of content is exceptional, and the curation saves me hours every week.',
+    avatar: `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload/v1/user1.jpg`,
   },
   {
     id: 2,
-    name: "Marcus Johnson",
-    role: "Startup Founder",
-    content: "The business insights I get from NewsEcho are invaluable. It's like having a personal research team delivering the most relevant information.",
-    avatar: "https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=150"
+    name: 'Marcus Johnson',
+    role: 'Startup Founder',
+    content: 'The business insights I get from NewsEcho are invaluable. It’s like having a personal research team delivering the most relevant information.',
+    avatar: `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload/v1/user2.jpg`,
   },
   {
     id: 3,
-    name: "Emily Rodriguez",
-    role: "UX Designer",
-    content: "I love how clean and organized everything is. The design inspiration newsletters have helped me discover so many amazing projects and techniques.",
-    avatar: "https://images.pexels.com/photos/3756679/pexels-photo-3756679.jpeg?auto=compress&cs=tinysrgb&w=150"
+    name: 'Emily Rodriguez',
+    role: 'UX Designer',
+    content: 'I love how clean and organized everything is. The design inspiration newsletters have helped me discover so many amazing projects and techniques.',
+    avatar: `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload/v1/user3.jpg`,
   },
   {
     id: 4,
-    name: "David Kim",
-    role: "Software Engineer",
-    content: "The tech trends weekly has become essential reading. It keeps me ahead of the curve and helps me make better technology choices for my projects.",
-    avatar: "https://images.pexels.com/photos/3778603/pexels-photo-3778603.jpeg?auto=compress&cs=tinysrgb&w=150"
-  }
+    name: 'David Kim',
+    role: 'Software Engineer',
+    content: 'The tech trends weekly has become essential reading. It keeps me ahead of the curve and helps me make better technology choices for my projects.',
+    avatar: `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload/v1/user4.jpg`,
+  },
 ];
 
 export default function Testimonials() {
@@ -41,7 +42,7 @@ export default function Testimonials() {
 
   useEffect(() => {
     if (!isAutoPlaying) return;
-    
+
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % testimonials.length);
     }, 5000);
@@ -95,15 +96,15 @@ export default function Testimonials() {
           >
             <div className="text-center">
               <Quote className="w-12 h-12 text-black dark:text-gray-400 mx-auto mb-6 opacity-50" />
-              
               <p className="font-inter text-lg md:text-xl text-gray-700 dark:text-gray-300 leading-relaxed mb-8 italic">
-                "{testimonials[currentIndex].content}"
+                &quot;{testimonials[currentIndex].content}&quot;
               </p>
-              
               <div className="flex items-center justify-center space-x-4">
-                <img
+                <Image
                   src={testimonials[currentIndex].avatar}
                   alt={testimonials[currentIndex].name}
+                  width={64}
+                  height={64}
                   className="w-16 h-16 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700"
                 />
                 <div>
@@ -118,7 +119,6 @@ export default function Testimonials() {
             </div>
           </motion.div>
 
-          {/* Navigation Buttons */}
           <div className="flex justify-center items-center mt-8 space-x-4">
             <motion.button
               whileHover={{ scale: 1.1 }}
@@ -128,8 +128,6 @@ export default function Testimonials() {
             >
               <ChevronLeft className="w-6 h-6" />
             </motion.button>
-
-            {/* Dots */}
             <div className="flex space-x-2">
               {testimonials.map((_, index) => (
                 <motion.button
@@ -137,14 +135,13 @@ export default function Testimonials() {
                   whileHover={{ scale: 1.2 }}
                   onClick={() => goToSlide(index)}
                   className={`w-3 h-3 rounded-full transition-all duration-300 ${
-                    index === currentIndex 
-                      ? 'bg-black dark:bg-gray-400 scale-125' 
+                    index === currentIndex
+                      ? 'bg-black dark:bg-gray-400 scale-125'
                       : 'bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500'
                   }`}
                 />
               ))}
             </div>
-
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}

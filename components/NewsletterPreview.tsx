@@ -2,35 +2,36 @@
 
 import { motion } from 'framer-motion';
 import { ArrowRight, Calendar, Clock } from 'lucide-react';
+import Image from 'next/image';
 
 const newsletters = [
   {
     id: 1,
-    title: "Tech Trends Weekly",
-    description: "Latest developments in AI, machine learning, and emerging technologies that are shaping our future.",
-    image: "https://images.pexels.com/photos/3861969/pexels-photo-3861969.jpeg?auto=compress&cs=tinysrgb&w=400",
-    date: "Dec 15, 2024",
-    readTime: "5 min read",
-    category: "Technology"
+    title: 'Tech Trends Weekly',
+    description: 'Latest developments in AI, machine learning, and emerging technologies that are shaping our future.',
+    image: `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload/v1/newsletter-tech.jpg`,
+    date: 'Dec 15, 2024',
+    readTime: '5 min read',
+    category: 'Technology',
   },
   {
     id: 2,
-    title: "Business Insights",
-    description: "Strategic insights and market analysis to help you make informed business decisions.",
-    image: "https://images.pexels.com/photos/3184360/pexels-photo-3184360.jpeg?auto=compress&cs=tinysrgb&w=400",
-    date: "Dec 12, 2024",
-    readTime: "7 min read",
-    category: "Business"
+    title: 'Business Insights',
+    description: 'Strategic insights and market analysis to help you make informed business decisions.',
+    image: `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload/v1/newsletter-business.jpg`,
+    date: 'Dec 12, 2024',
+    readTime: '7 min read',
+    category: 'Business',
   },
   {
     id: 3,
-    title: "Design Inspiration",
-    description: "Creative trends, design patterns, and visual inspiration from around the world.",
-    image: "https://images.pexels.com/photos/196644/pexels-photo-196644.jpeg?auto=compress&cs=tinysrgb&w=400",
-    date: "Dec 10, 2024",
-    readTime: "4 min read",
-    category: "Design"
-  }
+    title: 'Design Inspiration',
+    description: 'Creative trends, design patterns, and visual inspiration from around the world.',
+    image: `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload/v1/newsletter-design.jpg`,
+    date: 'Dec 10, 2024',
+    readTime: '4 min read',
+    category: 'Design',
+  },
 ];
 
 export default function NewsletterPreview() {
@@ -64,9 +65,11 @@ export default function NewsletterPreview() {
               className="group bg-white dark:bg-gray-800 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden shadow-md"
             >
               <div className="relative overflow-hidden">
-                <img
+                <Image
                   src={newsletter.image}
                   alt={newsletter.title}
+                  width={400}
+                  height={192}
                   className="w-full h-48 object-cover group-hover:scale-110 transition-transform duration-500"
                 />
                 <div className="absolute top-4 left-4">
@@ -75,16 +78,14 @@ export default function NewsletterPreview() {
                   </span>
                 </div>
               </div>
-              
+
               <div className="p-6 space-y-4">
                 <h3 className="font-bold text-xl text-black dark:text-white group-hover:text-gray-700 dark:group-hover:text-gray-300 transition-colors">
                   {newsletter.title}
                 </h3>
-                
                 <p className="font-inter text-gray-600 dark:text-gray-300 leading-relaxed">
                   {newsletter.description}
                 </p>
-                
                 <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
                   <div className="flex items-center space-x-4">
                     <div className="flex items-center space-x-1">
@@ -97,7 +98,6 @@ export default function NewsletterPreview() {
                     </div>
                   </div>
                 </div>
-                
                 <motion.button
                   whileHover={{ x: 5 }}
                   className="group/btn flex items-center space-x-2 text-black dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-100 font-medium transition-colors pt-2"
@@ -109,7 +109,7 @@ export default function NewsletterPreview() {
             </motion.div>
           ))}
         </div>
-        
+
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
