@@ -10,16 +10,7 @@ import { collection, getDocs, query, orderBy, where, limit } from 'firebase/fire
 import { BarChart2, Users, MessageSquare, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
-
-interface Newsletter {
-  id: string;
-  title: string;
-  date: Date;
-  status: 'published' | 'draft';
-  replies: number;
-  subscribers: number;
-  imageUrl?: string;
-}
+import { Newsletter } from '../../../types/newsletter';
 
 export default function AdminDashboard() {
   const [totalNewsletters, setTotalNewsletters] = useState(0);
@@ -93,7 +84,7 @@ export default function AdminDashboard() {
           );
           currentSubscriberCount = currentSubscribers.size;
           previousSubscriberCount = previousSubscribers.size;
-        } catch (err) {
+        } catch (err: unknown) {
           console.warn('Subscriber query failed, defaulting to 0 growth:', err);
           setActiveSubscribers(0);
           currentSubscriberCount = 0;
@@ -143,21 +134,21 @@ export default function AdminDashboard() {
         const recentQuery = query(collection(db, 'newsletters'), orderBy('date', 'desc'), limit(3));
         const recentSnapshot = await getDocs(recentQuery);
         const recentNewslettersData: Newsletter[] = recentSnapshot.docs
-        .filter((doc) => doc.data().date)
-        .map((doc) => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            title: data.title || 'Untitled',
-            date: data.date.toDate(),
-            status: data.status || 'draft',
-            replies: data.replies || 0,
-            subscribers: data.subscribers || 0,
-            imageUrl: data.imageUrl,
-          };
-        });
-      setRecentNewsletters(recentNewslettersData);
-      
+          .filter((doc) => doc.data().date)
+          .map((doc) => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              title: data.title || 'Untitled',
+              date: data.date.toDate(),
+              status: data.status || 'draft',
+              replies: data.replies || 0,
+              subscribers: data.subscribers || 0,
+              imageUrl: data.imageUrl,
+              content: data.content || '',
+            };
+          });
+        setRecentNewsletters(recentNewslettersData);
 
         // Engagement Data
         const engagementQuery = query(
@@ -185,11 +176,11 @@ export default function AdminDashboard() {
         const recentPeriod = recent7Days.slice(4, 7).reduce((sum, val) => sum + val, 0);
         const growth = earlyPeriod === 0 ? 0 : ((recentPeriod - earlyPeriod) / earlyPeriod) * 100;
         setGrowthPercentage(Math.round(growth * 10) / 10);
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const error = err instanceof Error ? err : new Error('Unknown error');
         console.error('Detailed fetch error:', {
-          message: err.message,
-          code: err.code,
-          stack: err.stack,
+          message: error.message,
+          stack: error.stack,
         });
         toast.error('Failed to load dashboard data. Please check Firebase configuration and indexes.');
       } finally {
@@ -210,7 +201,7 @@ export default function AdminDashboard() {
             Dashboard Overview
           </h1>
           <p className="mt-2 text-gray-600 dark:text-gray-300">
-            Welcome back! Here's what&rsquo;s happening with your newsletter platform.
+            Welcome back! Here&apos;s what&apos;s happening with your newsletter platform.
           </p>
         </motion.div>
 
