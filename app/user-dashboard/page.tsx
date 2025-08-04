@@ -1,112 +1,203 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { signOut } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
-import { motion } from 'framer-motion';
-import { useAuth } from '@/context/AuthContext';
-import { toast } from 'sonner';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { useState, useEffect } from 'react';
+import { Mail, Users, MessageSquare, TrendingUp } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
-import { Newsletter } from '../../types/newsletter';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { toast } from 'sonner';
 
-export default function UserDashboard() {
-  const { user, role, loading } = useAuth();
-  const router = useRouter();
-  const [newsletters, setNewsletters] = useState<Newsletter[]>([]);
+interface StatCardProps {
+  icon: React.ReactNode;
+  title: string;
+  value: string;
+  change?: string;
+  changeType?: 'positive' | 'negative';
+}
+
+function StatCard({ icon, title, value, change, changeType }: StatCardProps) {
+  return (
+    <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200/50 hover-lift">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-3">
+          <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center">
+            {icon}
+          </div>
+          <div>
+            <p className="text-sm font-medium text-slate-600">{title}</p>
+            <p className="text-2xl font-bold text-slate-900">{value}</p>
+          </div>
+        </div>
+        {change && (
+          <div className={`flex items-center space-x-1 text-sm ${
+            changeType === 'positive' ? 'text-green-600' : 'text-red-600'
+          }`}>
+            <TrendingUp className="w-4 h-4" />
+            <span>{change}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface Newsletter {
+  id: string;
+  title: string;
+  isSubscribed: boolean;
+}
+
+interface Reply {
+  id: string;
+  newsletterTitle: string;
+  message: string;
+  createdAt: string;
+}
+
+export default function Dashboard() {
+  const { user, loading: authLoading } = useAuth();
+  const [stats, setStats] = useState({
+    totalNewsletters: 0,
+    subscribedNewsletters: 0,
+    totalReplies: 0,
+  });
+  const [recentReplies, setRecentReplies] = useState<Reply[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!loading && (!user || role !== 'user' || !user.emailVerified)) {
-      toast.error('Please log in and verify your email to access the dashboard.');
-      router.push('/login');
-      return;
-    }
-    const fetchNewsletters = async () => {
+    const fetchData = async () => {
+      if (!user) return;
+      setLoading(true);
       try {
-        const q = query(collection(db, 'newsletters'), where('status', '==', 'published'));
-        const querySnapshot = await getDocs(q);
-        const newsletterData: Newsletter[] = querySnapshot.docs.map((doc) => ({
+        // Fetch newsletters
+        const newslettersQuery = query(collection(db, 'newsletters'), where('status', '==', 'published'));
+        const newslettersSnap = await getDocs(newslettersQuery);
+        const newsletters: Newsletter[] = newslettersSnap.docs.map(doc => ({
           id: doc.id,
-          ...doc.data(),
-          date: doc.data().date.toDate(),
-        } as Newsletter));
-        setNewsletters(newsletterData);
+          title: doc.data().title || 'Untitled',
+          isSubscribed: false,
+        }));
+
+        // Fetch user subscriptions
+        const subscriptionsQuery = query(collection(db, 'users', user.uid, 'subscriptions'));
+        const subscriptionsSnap = await getDocs(subscriptionsQuery);
+        const subscribedIds = subscriptionsSnap.docs.map(doc => doc.id);
+        newsletters.forEach(n => {
+          n.isSubscribed = subscribedIds.includes(n.id);
+        });
+
+        // Fetch user replies
+        const repliesQuery = query(collection(db, 'replies'), where('senderId', '==', user.uid));
+        const repliesSnap = await getDocs(repliesQuery);
+        const replies: Reply[] = repliesSnap.docs.map(doc => ({
+          id: doc.id,
+          newsletterTitle: doc.data().newsletterTitle || 'Unknown',
+          message: doc.data().message || '',
+          createdAt: doc.data().timestamp?.toDate().toISOString() || new Date().toISOString(),
+        }));
+
+        setStats({
+          totalNewsletters: newsletters.length,
+          subscribedNewsletters: newsletters.filter(n => n.isSubscribed).length,
+          totalReplies: replies.length,
+        });
+        setRecentReplies(replies.slice(0, 3));
       } catch (err: unknown) {
         const error = err instanceof Error ? err : new Error('Unknown error');
-        toast.error(`Failed to fetch newsletters: ${error.message}`);
+        console.error('Fetch dashboard data error:', error);
+        toast.error('Failed to load dashboard data');
+      } finally {
+        setLoading(false);
       }
     };
-    if (user) fetchNewsletters();
-  }, [user, role, loading, router]);
 
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      router.push('/login');
-    } catch (err: unknown) {
-      const error = err instanceof Error ? err : new Error('Unknown error');
-      console.error(error.message);
-      toast.error(`Failed to log out: ${error.message}`);
+    if (!authLoading && user) {
+      fetchData();
     }
-  };
+  }, [user, authLoading]);
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white dark:bg-black">
-        Loading...
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
-  if (!user || role !== 'user' || !user.emailVerified) {
-    return null;
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-slate-600">Please log in to view your dashboard.</p>
+      </div>
+    );
   }
 
   return (
-    <section className="min-h-screen flex items-center justify-center bg-white dark:bg-black">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="max-w-7xl w-full mx-4 p-8 bg-white dark:bg-gray-800 rounded-xl shadow-lg"
-      >
-        <h2 className="text-3xl font-playfair font-bold text-black dark:text-white mb-6 text-center">
-          Welcome, {user?.email}
-        </h2>
-        <p className="text-gray-600 dark:text-gray-300 mb-6 text-center">
-          You are logged in as a User. Enjoy your NewsEcho experience!
-        </p>
-        <div className="mb-8">
-          <h3 className="text-xl font-playfair font-semibold text-black dark:text-white mb-4">
-            Your Newsletters
-          </h3>
-          {newsletters.length === 0 ? (
-            <p className="text-gray-600 dark:text-gray-300">No newsletters available.</p>
-          ) : (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {newsletters.map((newsletter) => (
-                <motion.div
-                  key={newsletter.id}
-                  whileHover={{ scale: 1.02 }}
-                  className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-300 dark:border-gray-600 p-6"
-                >
-                  <h4 className="text-lg font-medium text-black dark:text-white">{newsletter.title}</h4>
-                  <p className="text-gray-600 dark:text-gray-300 mt-2">{newsletter.content}</p>
-                </motion.div>
-              ))}
+    <div className="space-y-8 animate-fade-in">
+      {/* Welcome Banner */}
+      <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl p-8 text-white">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">Welcome back, {user.displayName || 'User'}!</h1>
+            <p className="text-blue-100 text-lg">
+              Here's what's happening with your newsletters today.
+            </p>
+          </div>
+          <div className="hidden md:block">
+            <div className="w-32 h-32 bg-white/10 rounded-full flex items-center justify-center">
+              <Mail className="w-16 h-16 text-white/80" />
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <StatCard
+          icon={<Mail className="w-6 h-6 text-blue-500" />}
+          title="Total Newsletters"
+          value={stats.totalNewsletters.toString()}
+          change="+3 this week"
+          changeType="positive"
+        />
+        <StatCard
+          icon={<Users className="w-6 h-6 text-green-500" />}
+          title="Your Subscriptions"
+          value={stats.subscribedNewsletters.toString()}
+          change="+1 this week"
+          changeType="positive"
+        />
+        <StatCard
+          icon={<MessageSquare className="w-6 h-6 text-purple-500" />}
+          title="Replies Sent"
+          value={stats.totalReplies.toString()}
+        />
+      </div>
+
+      {/* Recent Activity */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200/50">
+        <h2 className="text-xl font-bold text-slate-900 mb-6">Recent Activity</h2>
+        <div className="space-y-4">
+          {recentReplies.length > 0 ? (
+            recentReplies.map((reply) => (
+              <div key={reply.id} className="flex items-start space-x-4 p-4 bg-gray-50 rounded-xl">
+                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                  <MessageSquare className="w-5 h-5 text-blue-500" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium text-slate-900">{reply.newsletterTitle}</p>
+                  <p className="text-slate-600 text-sm mt-1">{reply.message.substring(0, 100)}...</p>
+                  <p className="text-xs text-slate-400 mt-2">
+                    {new Date(reply.createdAt).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+            ))
+          ) : (
+            <p className="text-slate-500 text-sm">No recent replies.</p>
           )}
         </div>
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={handleLogout}
-          className="w-full max-w-xs mx-auto block py-3 px-4 bg-black dark:bg-gray-400 text-white rounded-lg font-medium transition-all duration-300"
-        >
-          Log Out
-        </motion.button>
-      </motion.div>
-    </section>
+      </div>
+    </div>
   );
 }
