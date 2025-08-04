@@ -9,7 +9,7 @@ import { useAuth } from '@/context/AuthContext';
 import { toast } from 'sonner';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { Newsletter } from '../../../types/newsletter';
+import { Newsletter } from '../../types/newsletter';
 
 export default function UserDashboard() {
   const { user, role, loading } = useAuth();

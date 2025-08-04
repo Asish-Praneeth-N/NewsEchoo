@@ -17,7 +17,7 @@ import {
 import { BarChart2, Users, MessageSquare, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { Newsletter } from "../../../types/newsletter";
+import { Newsletter } from "@/types/newsletter";
 
 export default function AdminDashboard() {
   const [totalNewsletters, setTotalNewsletters] = useState(0);
