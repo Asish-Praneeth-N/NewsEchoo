@@ -14,9 +14,13 @@ function CreateNewsletterContent() {
   const [content, setContent] = useState('');
   const [image, setImage] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [category, setCategory] = useState('General');
+  const [author, setAuthor] = useState('Unknown');
   const [isPublishing, setIsPublishing] = useState(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [currentStatus, setCurrentStatus] = useState<'published' | 'draft' | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const newsletterId = searchParams.get('id');
@@ -29,17 +33,19 @@ function CreateNewsletterContent() {
           const docSnap = await getDoc(docRef);
           if (docSnap.exists()) {
             const data = docSnap.data();
-            setTitle(data.title);
-            setContent(data.content);
+            setTitle(data.title || '');
+            setContent(data.content || '');
             setImageUrl(data.imageUrl || null);
-            setImage(data.imageUrl || null);
+            setImage(data.imageUrl || null); // Use Cloudinary URL for preview
+            setCategory(data.category || 'General');
+            setAuthor(data.author || 'Unknown');
+            setCurrentStatus(data.status || 'draft');
           } else {
             toast.error('Newsletter not found');
             router.push('/admin/newsletters');
           }
         } catch (err: unknown) {
-          const error = err instanceof Error ? err : new Error('Unknown error');
-          console.error('Fetch error:', error);
+          console.error('Fetch newsletter error:', err);
           toast.error('Failed to load newsletter');
         }
       };
@@ -49,78 +55,88 @@ function CreateNewsletterContent() {
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 10 * 1024 * 1024) {
-        toast.error('Image size exceeds 10MB');
-        return;
+    if (!file) {
+      toast.error('No file selected');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Image size exceeds 10MB');
+      return;
+    }
+    if (!['image/jpeg', 'image/png', 'image/gif'].includes(file.type)) {
+      toast.error('Only JPG, PNG, or GIF images are supported');
+      return;
+    }
+    setIsUploading(true);
+    try {
+      // Sanitize file name
+      const sanitizedFileName = file.name
+        .replace(/[^a-zA-Z0-9.-]/g, '-')
+        .replace(/-+/g, '-');
+      const formData = new FormData();
+      formData.append('file', file, sanitizedFileName);
+      formData.append('upload_preset', process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || '');
+      formData.append('resource_type', 'image');
+      formData.append('public_id', `newsletter_${Date.now()}`);
+      const response = await fetch(
+        `https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload`,
+        { method: 'POST', body: formData }
+      );
+      if (!response.ok) {
+        throw new Error(`Cloudinary upload failed: ${response.statusText}`);
       }
-      try {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('upload_preset', process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || '');
-        const response = await fetch(
-          `https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload`,
-          {
-            method: 'POST',
-            body: formData,
-          }
-        );
-        const data = await response.json();
-        if (data.secure_url) {
-          setImageUrl(data.secure_url);
-          const reader = new FileReader();
-          reader.onload = (e) => setImage(e.target?.result as string);
-          reader.readAsDataURL(file);
-          toast.success('Image uploaded successfully');
-        } else {
-          toast.error('Failed to upload image');
-        }
-      } catch (err: unknown) {
-        const error = err instanceof Error ? err : new Error('Unknown error');
-        console.error('Image upload error:', error);
-        toast.error('Failed to upload image');
+      const data = await response.json();
+      if (data.secure_url) {
+        setImageUrl(data.secure_url);
+        setImage(data.secure_url); // Use Cloudinary URL for preview
+        toast.success('Image uploaded successfully');
+      } else {
+        throw new Error('No secure_url in Cloudinary response');
       }
+    } catch (err: unknown) {
+      console.error('Image upload error:', err);
+      toast.error('Failed to upload image. Please try again.');
+    } finally {
+      setIsUploading(false);
     }
   };
 
   const saveNewsletter = async (status: 'published' | 'draft') => {
-    if (!title || !content) {
+    if (!title.trim() || !content.trim()) {
       toast.error('Title and content are required');
       return;
     }
     try {
+      const newsletterData = {
+        title: title.trim(),
+        content: content.trim(),
+        imageUrl: imageUrl || null,
+        category: category.trim() || 'General',
+        author: author.trim() || 'Unknown',
+        status,
+        publishedAt: status === 'published' ? new Date() : null,
+        updatedAt: new Date(),
+        subscribers: 0,
+        replies: 0,
+      };
       if (newsletterId) {
-        // Update existing newsletter
         const docRef = doc(db, 'newsletters', newsletterId);
-        await updateDoc(docRef, {
-          title,
-          content,
-          imageUrl: imageUrl || null,
-          status,
-          date: new Date(),
-        });
+        await updateDoc(docRef, newsletterData);
         toast.success(`Newsletter ${status === 'published' ? 'published' : 'updated as draft'} successfully`);
       } else {
-        // Create new newsletter
-        await addDoc(collection(db, 'newsletters'), {
-          title,
-          content,
-          imageUrl: imageUrl || null,
-          status,
-          date: new Date(),
-          subscribers: 0,
-          replies: 0,
-        });
+        await addDoc(collection(db, 'newsletters'), newsletterData);
         toast.success(`Newsletter ${status === 'published' ? 'published' : 'saved as draft'} successfully`);
       }
       setTitle('');
       setContent('');
       setImage(null);
       setImageUrl(null);
+      setCategory('General');
+      setAuthor('Unknown');
+      setCurrentStatus(null);
       router.push('/admin/newsletters');
     } catch (err: unknown) {
-      const error = err instanceof Error ? err : new Error('Unknown error');
-      console.error('Save error:', error);
+      console.error('Save newsletter error:', err);
       toast.error(`Failed to ${newsletterId ? 'update' : 'save'} newsletter`);
     }
   };
@@ -139,7 +155,7 @@ function CreateNewsletterContent() {
 
   const handleUpdate = async () => {
     setIsUpdating(true);
-    await saveNewsletter('draft');
+    await saveNewsletter(currentStatus || 'draft');
     setIsUpdating(false);
   };
 
@@ -173,12 +189,47 @@ function CreateNewsletterContent() {
 
         <div className="mb-8">
           <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-3">
+            Category
+          </label>
+          <input
+            type="text"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            placeholder="Enter newsletter category..."
+            className="w-full px-4 py-4 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-gray-500 dark:focus:ring-gray-400 focus:border-gray-500 dark:focus:border-gray-400 transition-colors dark:bg-gray-700 dark:text-white"
+          />
+        </div>
+
+        <div className="mb-8">
+          <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-3">
+            Author
+          </label>
+          <input
+            type="text"
+            value={author}
+            onChange={(e) => setAuthor(e.target.value)}
+            placeholder="Enter author name..."
+            className="w-full px-4 py-4 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-gray-500 dark:focus:ring-gray-400 focus:border-gray-500 dark:focus:border-gray-400 transition-colors dark:bg-gray-700 dark:text-white"
+          />
+        </div>
+
+        <div className="mb-8">
+          <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-3">
             Featured Image
           </label>
           <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-8 text-center hover:border-gray-400 dark:hover:border-gray-500 transition-colors">
             {image ? (
               <div className="space-y-4">
-                <img src={image} alt="Preview" className="max-h-48 mx-auto rounded-lg" />
+                <img
+                  src={image}
+                  alt="Preview"
+                  className="max-h-48 mx-auto rounded-lg"
+                  onError={() => {
+                    console.warn('Failed to load preview image');
+                    toast.error('Failed to display image preview');
+                    setImage(null);
+                  }}
+                />
                 <button
                   onClick={() => {
                     setImage(null);
@@ -199,10 +250,20 @@ function CreateNewsletterContent() {
                   <label className="inline-flex items-center px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-lg hover:bg-gray-800 dark:hover:bg-gray-200 cursor-pointer transition-colors">
                     <Upload className="w-4 h-4 mr-2" />
                     Choose file
-                    <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept="image/jpeg,image/png,image/gif"
+                      onChange={handleImageUpload}
+                    />
                   </label>
                 </div>
-                <p className="text-xs text-gray-600 dark:text-gray-300">PNG, JPG up to 10MB</p>
+                <p className="text-xs text-gray-600 dark:text-gray-300">
+                  JPG, PNG, or GIF up to 10MB
+                </p>
+                {isUploading && (
+                  <div className="w-8 h-8 border-2 border-blue-600 dark:border-blue-400 border-t-transparent rounded-full animate-spin mx-auto" />
+                )}
               </div>
             )}
           </div>
@@ -235,7 +296,7 @@ function CreateNewsletterContent() {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={handleUpdate}
-                disabled={isUpdating || !title || !content}
+                disabled={isUpdating || !title.trim() || !content.trim()}
                 className="flex items-center px-8 py-3 bg-black dark:bg-white text-white dark:text-black rounded-xl hover:bg-gray-800 dark:hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm hover:shadow-md"
               >
                 {isUpdating ? (
@@ -254,7 +315,7 @@ function CreateNewsletterContent() {
               <>
                 <button
                   onClick={handleSaveDraft}
-                  disabled={isSavingDraft || !title || !content}
+                  disabled={isSavingDraft || !title.trim() || !content.trim()}
                   className="px-6 py-3 text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSavingDraft ? 'Saving...' : 'Save Draft'}
@@ -263,7 +324,7 @@ function CreateNewsletterContent() {
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={handlePublish}
-                  disabled={isPublishing || !title || !content}
+                  disabled={isPublishing || !title.trim() || !content.trim()}
                   className="flex items-center px-8 py-3 bg-black dark:bg-white text-white dark:text-black rounded-xl hover:bg-gray-800 dark:hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm hover:shadow-md"
                 >
                   {isPublishing ? (

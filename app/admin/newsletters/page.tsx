@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import AdminLayout from '@/components/admin/AdminLayout';
+import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import AdminLayout from "@/components/admin/AdminLayout";
 import {
   Search,
   Filter,
@@ -11,8 +11,9 @@ import {
   MessageSquare,
   Edit,
   Trash,
-} from 'lucide-react';
-import { db } from '@/lib/firebase';
+  Image as ImageIcon,
+} from "lucide-react";
+import { db } from "@/lib/firebase";
 import {
   collection,
   getDocs,
@@ -20,48 +21,56 @@ import {
   orderBy,
   deleteDoc,
   doc,
-} from 'firebase/firestore';
-import { useRouter } from 'next/navigation';
-import { toast } from 'sonner';
+} from "firebase/firestore";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 interface Newsletter {
   id: string;
   title: string;
-  date: Date;
-  status: 'published' | 'draft';
+  publishedAt: Date | null;
+  status: "published" | "draft";
   replies: number;
   subscribers: number;
-  imageUrl?: string;
+  imageUrl?: string | null;
+  author: string;
+  category: string;
 }
 
 export default function ManageNewsletters() {
   const [newsletters, setNewsletters] = useState<Newsletter[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filter, setFilter] = useState('all');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filter, setFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
     const fetchNewsletters = async () => {
       try {
-        const q = query(collection(db, 'newsletters'), orderBy('date', 'desc'));
+        const q = query(
+          collection(db, "newsletters"),
+          orderBy("updatedAt", "desc")
+        );
         const querySnapshot = await getDocs(q);
         const newslettersData = querySnapshot.docs.map((doc) => {
           const data = doc.data();
           return {
             id: doc.id,
-            title: data.title,
-            date: data.date?.toDate(),
-            status: data.status || 'draft', // Default to draft if not found
+            title: data.title || "Untitled",
+            publishedAt: data.publishedAt?.toDate() || null,
+            status: data.status || "draft",
             replies: data.replies || 0,
             subscribers: data.subscribers || 0,
-            imageUrl: data.imageUrl || '',
+            imageUrl: data.imageUrl || null,
+            author: data.author || "Unknown",
+            category: data.category || "General",
           };
         }) as Newsletter[];
         setNewsletters(newslettersData);
+        console.log(`Fetched ${newslettersData.length} newsletters`);
       } catch (err) {
-        console.error('Fetch error:', err);
-        toast.error('Failed to load newsletters');
+        console.error("Fetch newsletters error:", err);
+        toast.error("Failed to load newsletters");
       } finally {
         setLoading(false);
       }
@@ -70,14 +79,14 @@ export default function ManageNewsletters() {
   }, []);
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this newsletter?')) return;
+    if (!confirm("Are you sure you want to delete this newsletter?")) return;
     try {
-      await deleteDoc(doc(db, 'newsletters', id));
+      await deleteDoc(doc(db, "newsletters", id));
       setNewsletters((prev) => prev.filter((n) => n.id !== id));
-      toast.success('Newsletter deleted successfully');
+      toast.success("Newsletter deleted successfully");
     } catch (err) {
-      console.error('Delete error:', err);
-      toast.error('Failed to delete newsletter');
+      console.error("Delete newsletter error:", err);
+      toast.error("Failed to delete newsletter");
     }
   };
 
@@ -85,14 +94,13 @@ export default function ManageNewsletters() {
     const matchesSearch = newsletter.title
       .toLowerCase()
       .includes(searchTerm.toLowerCase());
-    const matchesFilter = filter === 'all' || newsletter.status === filter;
+    const matchesFilter = filter === "all" || newsletter.status === filter;
     return matchesSearch && matchesFilter;
   });
 
   return (
     <AdminLayout>
       <div className="space-y-8">
-        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -109,7 +117,7 @@ export default function ManageNewsletters() {
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            onClick={() => router.push('/admin/create')}
+            onClick={() => router.push("/admin/create")}
             className="flex items-center px-6 py-3 bg-black dark:bg-white text-white dark:text-black rounded-xl hover:bg-gray-800 dark:hover:bg-gray-200 transition-colors shadow-sm hover:shadow-md"
           >
             <Plus className="w-4 h-4 mr-2" />
@@ -117,7 +125,6 @@ export default function ManageNewsletters() {
           </motion.button>
         </motion.div>
 
-        {/* Filters */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -155,7 +162,6 @@ export default function ManageNewsletters() {
           </div>
         </motion.div>
 
-        {/* Table */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -166,18 +172,39 @@ export default function ManageNewsletters() {
             <table className="w-full">
               <thead className="bg-gray-100 dark:bg-gray-700 border-b border-gray-300 dark:border-gray-600">
                 <tr>
-                  <th className="text-left py-4 px-6 font-semibold text-black dark:text-white">Title</th>
-                  <th className="text-left py-4 px-6 font-semibold text-black dark:text-white">Date</th>
-                  <th className="text-left py-4 px-6 font-semibold text-black dark:text-white">Status</th>
-                  <th className="text-left py-4 px-6 font-semibold text-black dark:text-white">Replies</th>
-                  <th className="text-left py-4 px-6 font-semibold text-black dark:text-white">Sent to</th>
-                  <th className="text-right py-4 px-6 font-semibold text-black dark:text-white">Actions</th>
+                  <th className="text-left py-4 px-6 font-semibold text-black dark:text-white">
+                    Title
+                  </th>
+                  <th className="text-left py-4 px-6 font-semibold text-black dark:text-white">
+                    Category
+                  </th>
+                  <th className="text-left py-4 px-6 font-semibold text-black dark:text-white">
+                    Author
+                  </th>
+                  <th className="text-left py-4 px-6 font-semibold text-black dark:text-white">
+                    Published
+                  </th>
+                  <th className="text-left py-4 px-6 font-semibold text-black dark:text-white">
+                    Status
+                  </th>
+                  <th className="text-left py-4 px-6 font-semibold text-black dark:text-white">
+                    Replies
+                  </th>
+                  <th className="text-left py-4 px-6 font-semibold text-black dark:text-white">
+                    Subscribers
+                  </th>
+                  <th className="text-right py-4 px-6 font-semibold text-black dark:text-white">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-300 dark:divide-gray-600">
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="py-4 px-6 text-center text-gray-600 dark:text-gray-300">
+                    <td
+                      colSpan={8}
+                      className="py-4 px-6 text-center text-gray-600 dark:text-gray-300"
+                    >
                       Loading...
                     </td>
                   </tr>
@@ -192,28 +219,59 @@ export default function ManageNewsletters() {
                     >
                       <td className="py-4 px-6">
                         <div className="flex items-center space-x-4">
-                          {newsletter.imageUrl && (
+                          {newsletter.imageUrl ? (
                             <img
                               src={newsletter.imageUrl}
                               alt={newsletter.title}
                               className="w-12 h-12 rounded-lg object-cover"
+                              onError={(e) => {
+                                console.warn(
+                                  `Failed to load image for newsletter ${newsletter.id}`
+                                );
+                                (e.currentTarget as HTMLElement).style.display =
+                                  "none";
+                                (
+                                  e.currentTarget
+                                    .nextElementSibling as HTMLElement
+                                ).style.display = "flex";
+                              }}
                             />
-                          )}
-                          <div className="font-medium text-black dark:text-white">{newsletter.title}</div>
+                          ) : null}
+                          <div
+                            className="w-12 h-12 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center"
+                            style={{
+                              display: newsletter.imageUrl ? "none" : "flex",
+                            }}
+                          >
+                            <ImageIcon className="w-6 h-6 text-gray-600 dark:text-gray-300" />
+                          </div>
+                          <div className="font-medium text-black dark:text-white">
+                            {newsletter.title}
+                          </div>
                         </div>
+                      </td>
+                      <td className="py-4 px-6 text-gray-600 dark:text-gray-300">
+                        {newsletter.category}
+                      </td>
+                      <td className="py-4 px-6 text-gray-600 dark:text-gray-300">
+                        {newsletter.author}
                       </td>
                       <td className="py-4 px-6 text-gray-600 dark:text-gray-300">
                         <div className="flex items-center">
                           <Calendar className="w-4 h-4 mr-2" />
-                          {new Date(newsletter.date).toLocaleDateString()}
+                          {newsletter.publishedAt
+                            ? new Date(
+                                newsletter.publishedAt
+                              ).toLocaleDateString()
+                            : "Not published"}
                         </div>
                       </td>
                       <td className="py-4 px-6">
                         <span
                           className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            newsletter.status === 'published'
-                              ? 'bg-green-200 text-green-800 dark:bg-green-700 dark:text-green-200'
-                              : 'bg-yellow-200 text-yellow-800 dark:bg-yellow-700 dark:text-yellow-200'
+                            newsletter.status === "published"
+                              ? "bg-green-200 text-green-800 dark:bg-green-700 dark:text-green-200"
+                              : "bg-yellow-200 text-yellow-800 dark:bg-yellow-700 dark:text-yellow-200"
                           }`}
                         >
                           {newsletter.status}
@@ -228,12 +286,14 @@ export default function ManageNewsletters() {
                       <td className="py-4 px-6 text-gray-600 dark:text-gray-300">
                         {newsletter.subscribers > 0
                           ? newsletter.subscribers.toLocaleString()
-                          : '-'}
+                          : "-"}
                       </td>
                       <td className="py-4 px-6 text-right">
                         <div className="flex justify-end space-x-2">
                           <button
-                            onClick={() => router.push(`/admin/create?id=${newsletter.id}`)}
+                            onClick={() =>
+                              router.push(`/admin/create?id=${newsletter.id}`)
+                            }
                             className="p-2 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg transition-colors"
                           >
                             <Edit className="w-4 h-4 text-gray-600 dark:text-gray-300" />
@@ -263,8 +323,12 @@ export default function ManageNewsletters() {
             <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
               <Search className="w-8 h-8 text-gray-600 dark:text-gray-300" />
             </div>
-            <h3 className="text-lg font-medium text-black dark:text-white mb-2">No newsletters found</h3>
-            <p className="text-gray-600 dark:text-gray-300">Try adjusting your search or filter criteria.</p>
+            <h3 className="text-lg font-medium text-black dark:text-white mb-2">
+              No newsletters found
+            </h3>
+            <p className="text-gray-600 dark:text-gray-300">
+              Try adjusting your search or filter criteria.
+            </p>
           </motion.div>
         )}
       </div>
