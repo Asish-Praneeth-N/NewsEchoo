@@ -2,39 +2,96 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { applyActionCode, getAuth } from 'firebase/auth';
+import { applyActionCode, getAuth, signInWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
+import type { FirebaseError } from 'firebase/app';
 
 export default function VerifyEmail() {
   const [error, setError] = useState('');
   const [verified, setVerified] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isResending, setIsResending] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
   const searchParams = useSearchParams();
   const router = useRouter();
   const auth = getAuth();
+
+  const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
   useEffect(() => {
     const verify = async () => {
       const oobCode = searchParams.get('oobCode');
       if (!oobCode) {
-        setError('Invalid or missing verification code.');
+        setError('Invalid or missing verification link. Please resend the verification email.');
         return;
       }
 
+      setIsVerifying(true);
       try {
         await applyActionCode(auth, oobCode);
         await auth.currentUser?.reload();
         setVerified(true);
-        toast.success('Email verified successfully! You can now log in.');
+        toast.success('Email verified successfully! Redirecting to login...', {
+          duration: 5000,
+        });
         setTimeout(() => router.push('/login'), 3000);
-      } catch (err: unknown) {
-        const error = err instanceof Error ? err : new Error('Unknown error');
-        console.error('Verification error:', error);
-        setError(`Failed to verify email: ${error.message}`);
+      } catch (err) {
+        const error = err as FirebaseError;
+        console.error('Verification error:', error.message, { code: error.code, oobCode });
+        const errorMap: Record<string, string> = {
+          'auth/invalid-action-code': 'The verification link is invalid or expired.',
+          'auth/expired-action-code': 'The verification link has expired.',
+        };
+        setError(errorMap[error.code] || 'Failed to verify email. Please resend the verification email.');
+      } finally {
+        setIsVerifying(false);
       }
     };
     verify();
   }, [searchParams, router, auth]);
+
+  const handleResendVerification = async () => {
+    if (!email || !password) {
+      setError('Please enter your email and password to resend the verification email.');
+      return;
+    }
+    if (!isValidEmail(email)) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+    setIsResending(true);
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      if (userCredential.user.emailVerified) {
+        setError('This email is already verified. Please log in.');
+        await auth.signOut();
+        return;
+      }
+      await sendEmailVerification(userCredential.user, {
+        url: `${window.location.origin}/pages/verify-email`,
+      });
+      toast.success('Verification email resent. Please check your inbox and spam folder.', {
+        duration: 5000,
+      });
+    } catch (err) {
+      const error = err as FirebaseError;
+      console.error('Resend verification error:', error.message, { code: error.code, email });
+      const errorMap: Record<string, string> = {
+        'auth/user-not-found': 'Invalid email or password.',
+        'auth/wrong-password': 'Invalid email or password.',
+        'auth/too-many-requests': 'Too many requests. Please try again later.',
+      };
+      setError(errorMap[error.code] || 'Failed to resend verification email. Please try again.');
+    } finally {
+      setIsResending(false);
+      await auth.signOut();
+    }
+  };
 
   return (
     <section className="min-h-screen flex items-center justify-center bg-white dark:bg-black">
@@ -47,13 +104,54 @@ export default function VerifyEmail() {
         <h2 className="text-3xl font-playfair font-bold text-black dark:text-white mb-6 text-center">
           Email Verification
         </h2>
-        {error ? (
-          <p className="text-red-500 mb-4">{error}</p>
-        ) : verified ? (
+        {error && (
+          <div className="text-red-500 mb-4">
+            {error}
+            {error.includes('resend') && (
+              <div className="space-y-4 mt-4">
+                <Input
+                  type="email"
+                  placeholder="Enter your email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  aria-label="Email input"
+                />
+                <Input
+                  type="password"
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  aria-label="Password input"
+                />
+                <Button
+                  onClick={handleResendVerification}
+                  disabled={isResending}
+                  className="w-full bg-blue-500 text-white"
+                >
+                  {isResending ? 'Sending...' : 'Resend Verification Email'}
+                </Button>
+              </div>
+            )}
+            {error.includes('already verified') && (
+              <p className="mt-2">
+                <Link href="/login" className="text-blue-500 hover:underline">
+                  Go to Login
+                </Link>
+              </p>
+            )}
+          </div>
+        )}
+        {verified && (
           <p className="text-gray-600 dark:text-gray-300 mb-4">
             Your email has been verified. Redirecting to login...
           </p>
-        ) : (
+        )}
+        {isVerifying && (
+          <p className="text-gray-600 dark:text-gray-300 mb-4">Verifying your email...</p>
+        )}
+        {!error && !verified && !isVerifying && (
           <p className="text-gray-600 dark:text-gray-300 mb-4">Verifying your email...</p>
         )}
         <motion.button
