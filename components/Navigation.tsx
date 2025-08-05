@@ -1,9 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X } from 'lucide-react';
-import { useTheme } from 'next-themes';
 import { useAuth } from '@/context/AuthContext';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
@@ -31,9 +30,9 @@ export default function Navigation() {
       const element = document.getElementById(sectionId);
       if (element) {
         element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        setIsMobileMenuOpen(false);
       }
     }
+    setIsMobileMenuOpen(false);
   };
 
   const handleLogout = async () => {
@@ -43,6 +42,7 @@ export default function Navigation() {
     } catch (err: unknown) {
       console.error('Logout error:', err instanceof Error ? err.message : 'Unknown error');
     }
+    setIsMobileMenuOpen(false);
   };
 
   return (
@@ -71,12 +71,12 @@ export default function Navigation() {
               priority
               className="rounded-lg"
             />
-            <span className="font-playfair text-xl font-bold text-black dark:text-white">
+            <span className="font-playfair text-lg sm:text-xl font-bold text-black dark:text-white">
               NewsEcho
             </span>
           </motion.div>
 
-          <div className="hidden md:flex items-center space-x-8">
+          <div className="hidden md:flex items-center space-x-6 lg:space-x-8">
             {[
               { name: 'Home', id: 'hero' },
               { name: 'Newsletters', id: 'newsletters' },
@@ -98,21 +98,59 @@ export default function Navigation() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1 + 0.3 }}
                 whileHover={{ y: -2 }}
-                className="text-black dark:text-white hover:text-gray-700 dark:hover:text-gray-300 font-medium cursor-pointer"
+                className="text-black dark:text-white hover:text-gray-700 dark:hover:text-gray-300 font-medium cursor-pointer text-base"
               >
                 {item.name}
               </motion.a>
             ))}
           </div>
 
-          <button
-            className="md:hidden text-black dark:text-white"
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            aria-label="Toggle mobile menu"
-          >
-            {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </button>
+          <div className="flex items-center space-x-4">
+            <button
+              className="md:hidden text-black dark:text-white"
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              aria-label="Toggle mobile menu"
+            >
+              {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
 
+            <div className="hidden md:flex items-center space-x-4">
+              {loading ? (
+                <span className="text-black dark:text-white text-base">Loading...</span>
+              ) : user && user.emailVerified ? (
+                <motion.button
+                  whileHover={{ scale: 1.05, y: -2 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleLogout}
+                  className="bg-white/20 dark:bg-gray-800/20 px-4 py-2 rounded-lg text-black dark:text-white font-medium border border-black/10 dark:border-white/10 text-base"
+                >
+                  Logout
+                </motion.button>
+              ) : (
+                <>
+                  <motion.button
+                    whileHover={{ scale: 1.05, y: -2 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => router.push('/login')}
+                    className="bg-white/20 dark:bg-gray-800/20 px-4 py-2 rounded-lg text-black dark:text-white font-medium border border-black/10 dark:border-white/10 text-base"
+                  >
+                    Login
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.05, y: -2 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => router.push('/signup')}
+                    className="bg-black dark:bg-gray-400 text-white px-4 py-2 rounded-lg font-medium text-base transition-all duration-300 shadow-lg"
+                  >
+                    Sign Up
+                  </motion.button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <AnimatePresence>
           {isMobileMenuOpen && (
             <motion.div
               initial={{ height: 0, opacity: 0 }}
@@ -135,51 +173,55 @@ export default function Navigation() {
                     ]
                   : []),
               ].map((item) => (
-                <a
+                <motion.a
                   key={item.name}
                   onClick={() => scrollToSection(item.id)}
-                  className="text-black dark:text-white hover:text-gray-700 dark:hover:text-gray-300 transition-colors duration-300 font-medium cursor-pointer"
+                  whileHover={{ scale: 1.05 }}
+                  className="text-black dark:text-white hover:text-gray-700 dark:hover:text-gray-300 transition-colors duration-300 font-medium text-base cursor-pointer"
                 >
                   {item.name}
-                </a>
+                </motion.a>
               ))}
+              {loading ? (
+                <span className="text-black dark:text-white text-base">Loading...</span>
+              ) : user && user.emailVerified ? (
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleLogout}
+                  className="bg-white/20 dark:bg-gray-800/20 px-4 py-2 rounded-lg text-black dark:text-white font-medium border border-black/10 dark:border-white/10 text-base"
+                >
+                  Logout
+                </motion.button>
+              ) : (
+                <>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => {
+                      router.push('/login');
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="bg-white/20 dark:bg-gray-800/20 px-4 py-2 rounded-lg text-black dark:text-white font-medium border border-black/10 dark:border-white/10 text-base"
+                  >
+                    Login
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => {
+                      router.push('/signup');
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="bg-black dark:bg-gray-400 text-white px-4 py-2 rounded-lg font-medium text-base transition-all duration-300 shadow-lg"
+                  >
+                    Sign Up
+                  </motion.button>
+                </>
+              )}
             </motion.div>
           )}
-
-          <div className="hidden md:flex items-center space-x-4">
-            {loading ? (
-              <span className="text-black dark:text-white">Loading...</span>
-            ) : user && user.emailVerified ? (
-              <motion.button
-                whileHover={{ scale: 1.05, y: -2 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={handleLogout}
-                className="bg-white/20 dark:bg-gray-800/20 px-4 py-2 rounded-lg text-black dark:text-white font-medium border border-black/10 dark:border-white/10"
-              >
-                Logout
-              </motion.button>
-            ) : (
-              <>
-                <motion.button
-                  whileHover={{ scale: 1.05, y: -2 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => router.push('/login')}
-                  className="bg-white/20 dark:bg-gray-800/20 px-4 py-2 rounded-lg text-black dark:text-white font-medium border border-black/10 dark:border-white/10"
-                >
-                  Login
-                </motion.button>
-                <motion.button
-                  whileHover={{ scale: 1.05, y: -2 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => router.push('/signup')}
-                  className="bg-black dark:bg-gray-400 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 shadow-lg"
-                >
-                  Sign Up
-                </motion.button>
-              </>
-            )}
-          </div>
-        </div>
+        </AnimatePresence>
       </div>
     </motion.nav>
   );

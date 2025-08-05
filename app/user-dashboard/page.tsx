@@ -1,19 +1,20 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Mail, Users, MessageSquare, TrendingUp } from 'lucide-react';
-import { useAuth } from '@/context/AuthContext';
-import { db } from '@/lib/firebase';
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import { toast } from 'sonner';
-import Link from 'next/link';
+import { useState, useEffect } from "react";
+import { Mail, Users, MessageSquare, TrendingUp } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { db } from "@/lib/firebase";
+import { collection, getDocs, query, where } from "firebase/firestore";
+import { toast } from "sonner";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 interface StatCardProps {
   icon: React.ReactNode;
   title: string;
   value: string;
   change?: string;
-  changeType?: 'positive' | 'negative';
+  changeType?: "positive" | "negative";
 }
 
 function StatCard({ icon, title, value, change, changeType }: StatCardProps) {
@@ -30,9 +31,11 @@ function StatCard({ icon, title, value, change, changeType }: StatCardProps) {
           </div>
         </div>
         {change && (
-          <div className={`flex items-center space-x-1 text-sm ${
-            changeType === 'positive' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-          }`}>
+          <div
+            className={`flex items-center space-x-1 text-sm ${
+              changeType === "positive" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+            }`}
+          >
             <TrendingUp className="w-4 h-4" />
             <span>{change}</span>
           </div>
@@ -64,49 +67,52 @@ export default function Dashboard() {
   });
   const [recentReplies, setRecentReplies] = useState<Reply[]>([]);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
+    if (!authLoading && user && role === "admin") {
+      router.push("/admin");
+      return;
+    }
+
     const fetchData = async () => {
       if (!user) return;
       setLoading(true);
       try {
-        // Fetch newsletters
-        const newslettersQuery = query(collection(db, 'newsletters'), where('status', '==', 'published'));
+        const newslettersQuery = query(collection(db, "newsletters"), where("status", "==", "published"));
         const newslettersSnap = await getDocs(newslettersQuery);
-        const newsletters: Newsletter[] = newslettersSnap.docs.map(doc => ({
+        const newsletters: Newsletter[] = newslettersSnap.docs.map((doc) => ({
           id: doc.id,
-          title: doc.data().title || 'Untitled',
+          title: doc.data().title || "Untitled",
           isSubscribed: false,
         }));
 
-        // Fetch user subscriptions
-        const subscriptionsQuery = query(collection(db, 'users', user.uid, 'subscriptions'));
+        const subscriptionsQuery = query(collection(db, "users", user.uid, "subscriptions"));
         const subscriptionsSnap = await getDocs(subscriptionsQuery);
-        const subscribedIds = subscriptionsSnap.docs.map(doc => doc.id);
-        newsletters.forEach(n => {
+        const subscribedIds = subscriptionsSnap.docs.map((doc) => doc.id);
+        newsletters.forEach((n) => {
           n.isSubscribed = subscribedIds.includes(n.id);
         });
 
-        // Fetch user replies
-        const repliesQuery = query(collection(db, 'replies'), where('senderId', '==', user.uid));
+        const repliesQuery = query(collection(db, "replies"), where("senderId", "==", user.uid));
         const repliesSnap = await getDocs(repliesQuery);
-        const replies: Reply[] = repliesSnap.docs.map(doc => ({
+        const replies: Reply[] = repliesSnap.docs.map((doc) => ({
           id: doc.id,
-          newsletterTitle: doc.data().newsletterTitle || 'Unknown',
-          message: doc.data().message || '',
+          newsletterTitle: doc.data().newsletterTitle || "Unknown",
+          message: doc.data().message || "",
           createdAt: doc.data().timestamp?.toDate().toISOString() || new Date().toISOString(),
         }));
 
         setStats({
           totalNewsletters: newsletters.length,
-          subscribedNewsletters: newsletters.filter(n => n.isSubscribed).length,
+          subscribedNewsletters: newsletters.filter((n) => n.isSubscribed).length,
           totalReplies: replies.length,
         });
         setRecentReplies(replies.slice(0, 3));
       } catch (err: unknown) {
-        const error = err instanceof Error ? err : new Error('Unknown error');
-        console.error('Fetch dashboard data error:', error);
-        toast.error('Failed to load dashboard data');
+        const error = err instanceof Error ? err : new Error("Unknown error");
+        console.error("Fetch dashboard data error:", error);
+        toast.error("Failed to load dashboard data");
       } finally {
         setLoading(false);
       }
@@ -115,7 +121,7 @@ export default function Dashboard() {
     if (!authLoading && user) {
       fetchData();
     }
-  }, [user, authLoading]);
+  }, [user, authLoading, role, router]);
 
   if (authLoading || loading) {
     return (
@@ -135,15 +141,12 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8 animate-fade-in">
-      {/* Welcome Banner */}
       <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl p-8 text-white">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold mb-2">Welcome back, {user.displayName || 'User'}!</h1>
-            <p className="text-blue-100 text-lg">
-              Here&apos;s what&apos;s happening with your newsletters today.
-            </p>
-            {role === 'admin' && (
+            <h1 className="text-3xl font-bold mb-2">Welcome back, {user.displayName || "User"}!</h1>
+            <p className="text-blue-100 text-lg">Here&apos;s what&apos;s happening with your newsletters today.</p>
+            {role === "admin" && (
               <p className="text-blue-200 text-sm mt-2">
                 You have admin access. Visit the <Link href="/admin" className="underline">Admin Dashboard</Link> for more controls.
               </p>
@@ -157,7 +160,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <StatCard
           icon={<Mail className="w-6 h-6 text-blue-500 dark:text-blue-400" />}
@@ -180,7 +182,6 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Recent Activity */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-200/50 dark:border-gray-700/50">
         <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-6">Recent Activity</h2>
         <div className="space-y-4">

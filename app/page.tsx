@@ -13,23 +13,23 @@ export default function Home() {
   return (
     <div className="min-h-screen">
       <Navigation />
-      <main>
-        <section id="hero">
+      <main className="flex flex-col gap-16">
+        <section id="hero" className="w-full">
           <Hero />
         </section>
-        <section id="newsletters">
+        <section id="newsletters" className="w-full">
           <NewsletterPreview />
         </section>
-        <section id="how-it-works">
+        <section id="how-it-works" className="w-full">
           <HowItWorks />
         </section>
-        <section id="why-subscribe">
+        <section id="why-subscribe" className="w-full">
           <WhySubscribe />
         </section>
-        <section id="testimonials">
+        <section id="testimonials" className="w-full">
           <Testimonials />
         </section>
-        <section id="cta">
+        <section id="cta" className="w-full">
           <CallToAction />
         </section>
       </main>
