@@ -162,7 +162,7 @@ export default function Dashboard() {
               Welcome back, {user.displayName || "User"}!
             </h1>
             <p className="text-blue-100 text-lg">
-              Here&#39;s what&#39;s happening with your newsletters today.
+              Here&apos;s what&apos;s happening with your newsletters today.
             </p>
             {role === "admin" && (
               <p className="text-blue-200 text-sm mt-2">
