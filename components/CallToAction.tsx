@@ -36,9 +36,10 @@ export default function CallToAction() {
           </h2>
           
           <p className="font-inter text-base sm:text-lg md:text-xl text-white/90 leading-relaxed max-w-2xl mx-auto">
-            Don’t miss out on the insights that matter. Subscribe now and get your first 
-            curated newsletter within 24 hours.
-          </p>
+  Don&rsquo;t miss out on the insights that matter. Subscribe now and get your first 
+  curated newsletter within 24 hours.
+</p>
+
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center max-w-md mx-auto">
             <motion.button

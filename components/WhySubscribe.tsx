@@ -107,8 +107,9 @@ export default function WhySubscribe() {
             Ready to Transform Your Reading Experience?
           </h3>
           <p className="font-inter text-gray-600 dark:text-gray-300 text-sm sm:text-base mb-6 max-w-xl mx-auto">
-            Join thousands of satisfied readers who have made NewsEcho their go-to source for quality content.
-          </p>
+  Join thousands of satisfied readers who have made NewsEcho their go&ndash;to source for quality content.
+</p>
+
           <motion.button
             whileHover={{ scale: 1.05, y: -2 }}
             whileTap={{ scale: 0.95 }}
