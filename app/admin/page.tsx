@@ -190,7 +190,7 @@ export default function AdminDashboard() {
             Dashboard Overview
           </h1>
           <p className="mt-2 text-gray-600 dark:text-gray-300">
-            Welcome back! Here's what’s happening with your newsletter platform.
+            Welcome back! Here&apos;s what&apos;s happening with your newsletter platform.
           </p>
         </motion.div>
 
