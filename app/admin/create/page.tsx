@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { Upload, Eye, Send, Image as ImageIcon, Save } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, getDoc, updateDoc, getDocs, query, where } from 'firebase/firestore';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 
@@ -23,13 +23,13 @@ function CreateNewsletterContent() {
   const [isUploading, setIsUploading] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const newsletterId = searchParams.get('id');
+  const newsletterIdParam = searchParams.get('id');
 
   useEffect(() => {
-    if (newsletterId) {
+    if (newsletterIdParam) {
       const fetchNewsletter = async () => {
         try {
-          const docRef = doc(db, 'newsletters', newsletterId);
+          const docRef = doc(db, 'newsletters', newsletterIdParam);
           const docSnap = await getDoc(docRef);
           if (docSnap.exists()) {
             const data = docSnap.data();
@@ -51,7 +51,7 @@ function CreateNewsletterContent() {
       };
       fetchNewsletter();
     }
-  }, [newsletterId, router]);
+  }, [newsletterIdParam, router]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -101,11 +101,61 @@ function CreateNewsletterContent() {
     }
   };
 
+  const sendNotificationEmails = async (newsletterId: string) => {
+    try {
+      // Fetch active subscribers
+      const usersQuery = query(
+        collection(db, 'users'),
+        where('subscribed', '==', true),
+        where('role', '==', 'user')
+      );
+      const usersSnap = await getDocs(usersQuery);
+      const emails = usersSnap.docs
+        .map((doc) => doc.data().email)
+        .filter((email): email is string => typeof email === 'string' && email.trim() !== '');
+
+      if (emails.length === 0) {
+        console.log('No active subscribers to notify.');
+        return;
+      }
+
+      // Prepare email content
+      const subject = `New Newsletter Published: ${title}`;
+      const html = `
+        <h1>${title}</h1>
+        <p>By ${author}</p>
+        <p>${content.slice(0, 200)}...</p>
+        <a href="https://newsechoo.vercel.app/user-dashboard/subscriptions?newsletterId=${newsletterId}">
+          <button style="background-color: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">
+            View Newsletter
+          </button>
+        </a>
+      `;
+      const text = `New Newsletter: ${title}\nBy ${author}\n\n${content.slice(0, 200)}...\n\nView Newsletter: https://newsechoo.vercel.app/user-dashboard/subscriptions?newsletterId=${newsletterId}`;
+
+      // Trigger the email via the 'mail' collection (assuming Trigger Email extension is configured for 'mail' collection)
+      await addDoc(collection(db, 'mail'), {
+        to: emails,
+        message: {
+          subject,
+          html,
+          text,
+        },
+      });
+
+      toast.success(`Notification emails triggered for ${emails.length} subscribers`);
+    } catch (err: unknown) {
+      console.error('Error sending notification emails:', err);
+      toast.error('Failed to trigger notification emails');
+    }
+  };
+
   const saveNewsletter = async (status: 'published' | 'draft') => {
     if (!title.trim() || !content.trim()) {
       toast.error('Title and content are required');
       return;
     }
+    let newsletterId = newsletterIdParam;
     try {
       const newsletterData = {
         title: title.trim(),
@@ -119,14 +169,22 @@ function CreateNewsletterContent() {
         subscribers: 0,
         replies: 0,
       };
+      let shouldSendEmails = status === 'published' && currentStatus !== 'published';
+
       if (newsletterId) {
         const docRef = doc(db, 'newsletters', newsletterId);
         await updateDoc(docRef, newsletterData);
         toast.success(`Newsletter ${status === 'published' ? 'published' : 'updated as draft'} successfully`);
       } else {
-        await addDoc(collection(db, 'newsletters'), newsletterData);
+        const docRef = await addDoc(collection(db, 'newsletters'), newsletterData);
+        newsletterId = docRef.id;
         toast.success(`Newsletter ${status === 'published' ? 'published' : 'saved as draft'} successfully`);
       }
+
+      if (shouldSendEmails && newsletterId) {
+        await sendNotificationEmails(newsletterId);
+      }
+
       setTitle('');
       setContent('');
       setImage(null);
@@ -163,7 +221,7 @@ function CreateNewsletterContent() {
     <div className="max-w-4xl mx-auto space-y-8">
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="text-3xl font-playfair font-bold text-black dark:text-white">
-          {newsletterId ? 'Edit Newsletter' : 'Create Newsletter'}
+          {newsletterIdParam ? 'Edit Newsletter' : 'Create Newsletter'}
         </h1>
         <p className="mt-2 text-gray-600 dark:text-gray-300">Craft or update your newsletter.</p>
       </motion.div>
@@ -291,7 +349,7 @@ function CreateNewsletterContent() {
             Preview
           </button>
           <div className="flex items-center space-x-4">
-            {newsletterId ? (
+            {newsletterIdParam ? (
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
