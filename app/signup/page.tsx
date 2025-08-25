@@ -1,10 +1,11 @@
+// app/signup/page.tsx (updated with LoadingSpinner integration)
+
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createUserWithEmailAndPassword, sendEmailVerification, signInWithPopup } from 'firebase/auth';
-import { doc, setDoc, Timestamp } from 'firebase/firestore';
-import { auth, db, googleProvider } from '@/lib/firebase';
+import { auth, googleProvider } from '@/lib/firebase';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthContext';
@@ -35,7 +36,6 @@ export default function SignUp() {
     setError('');
     setIsSigningUp(true);
 
-    // Client-side validation
     if (!isValidEmail(email)) {
       setError('Please enter a valid email address.');
       setIsSigningUp(false);
@@ -55,64 +55,50 @@ export default function SignUp() {
     }
 
     try {
-      // Create user
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
 
-      // Send verification email
       await sendEmailVerification(userCredential.user, {
         url: `${window.location.origin}/pages/verify-email`,
       });
 
-      // Save user data to Firestore
-      await setDoc(
-        doc(db, 'users', userCredential.user.uid),
-        {
-          email,
-          role: 'user',
-          createdAt: Timestamp.fromDate(new Date()),
-        },
-        { merge: true }
-      );
-
-      // Show success toast
       toast.success('Verification email sent. Please check your inbox and spam folder.', {
         duration: 5000,
       });
 
-      // Clear form
       setEmail('');
       setPassword('');
       setConfirmPassword('');
 
-      // Navigate to login after 3 seconds
-      setTimeout(() => router.push('/login'), 3000);
+      // Keep isSigningUp true during the 2-second delay (shows loader)
+      setTimeout(() => {
+        setIsSigningUp(false);
+        router.push('/verification-sent');
+      }, 2000);
     } catch (err: any) {
-      // Log raw error for debugging
       console.error('Sign-up error:', {
         message: err.message || 'Unknown error',
         code: err.code || 'No code',
         email,
         stack: err.stack || 'No stack trace',
+        details: JSON.stringify(err, null, 2),
       });
 
-      // Handle Firebase-specific errors
       const errorMap: Record<string, string> = {
         'auth/email-already-in-use': 'This email is already registered. Try logging in or resetting your password.',
         'auth/weak-password': 'Password is too weak. Please use a stronger password.',
         'auth/invalid-email': 'Invalid email format.',
         'auth/too-many-requests': 'Too many sign-up attempts. Please try again later.',
         'auth/operation-not-allowed': 'Email/password sign-up is disabled. Please contact support.',
+        'auth/invalid-api-key': 'Invalid Firebase API key. Please check your configuration.',
         'firestore/permission-denied': 'Failed to save user data due to permission issues. Please contact support.',
       };
 
-      const errorMessage = errorMap[err.code] || 'Failed to sign up. Please try again.';
+      const errorMessage = errorMap[err.code] || `Failed to sign up: ${err.message || 'Unknown error'}`;
       setError(errorMessage);
 
-      // Sign out if user was created but subsequent steps failed
       if (err.code !== 'auth/email-already-in-use') {
         await auth.signOut();
       }
-    } finally {
       setIsSigningUp(false);
     }
   };
@@ -122,15 +108,6 @@ export default function SignUp() {
     setIsSigningUp(true);
     try {
       const userCredential = await signInWithPopup(auth, googleProvider);
-      await setDoc(
-        doc(db, 'users', userCredential.user.uid),
-        {
-          email: userCredential.user.email,
-          role: 'user',
-          createdAt: Timestamp.fromDate(new Date()),
-        },
-        { merge: true }
-      );
       toast.success('Signed up with Google successfully!');
       router.push('/user-dashboard');
     } catch (err: any) {
@@ -138,6 +115,7 @@ export default function SignUp() {
         message: err.message || 'Unknown error',
         code: err.code || 'No code',
         stack: err.stack || 'No stack trace',
+        details: JSON.stringify(err, null, 2),
       });
       setError('Failed to sign up with Google. Please try again.');
     } finally {
@@ -155,6 +133,16 @@ export default function SignUp() {
 
   if (user && role && user.emailVerified) {
     return null;
+  }
+
+  if (isSigningUp) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white dark:bg-black">
+        <div className="flex items-center justify-center p-6 sm:p-8">
+          <div className="animate-spin rounded-full h-10 sm:h-12 w-10 sm:w-12 border-b-2 border-blue-500"></div>
+        </div>
+      </div>
+    );
   }
 
   return (

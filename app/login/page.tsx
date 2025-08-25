@@ -53,16 +53,57 @@ export default function Login() {
       toast.success('Logged in successfully!');
       setIsLoggingIn(false);
       router.push('/user-dashboard');
-    } catch (err) {
-      const error = err as FirebaseError;
-      console.error('Login error:', error.message, { code: error.code, email });
+    } catch (err: any) {
+      console.error('Login error:', {
+        message: err.message || 'Unknown error',
+        code: err.code || 'No code',
+        email,
+        stack: err.stack || 'No stack trace',
+        details: JSON.stringify(err, null, 2),
+      });
       const errorMap: Record<string, string> = {
         'auth/user-not-found': 'Invalid email or password.',
         'auth/wrong-password': 'Invalid email or password.',
         'auth/too-many-requests': 'Too many login attempts. Please try again later.',
         'auth/invalid-credential': 'Invalid credentials provided.',
+        'auth/invalid-api-key': 'Invalid Firebase API key. Please check your configuration.',
       };
-      setError(errorMap[error.code] || 'Failed to log in. Please try again.');
+      setError(errorMap[err.code] || `Failed to log in: ${err.message || 'Unknown error'}`);
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setError('');
+    setIsLoggingIn(true);
+    try {
+      const userCredential = await signInWithPopup(auth, googleProvider);
+      await userCredential.user.reload();
+      if (!userCredential.user.emailVerified) {
+        await sendEmailVerification(userCredential.user, {
+          url: `${window.location.origin}/pages/verify-email`,
+        });
+        await auth.signOut();
+        setError('Please verify your email before logging in. Check your inbox or spam folder.');
+        setIsLoggingIn(false);
+        return;
+      }
+      toast.success('Signed in with Google successfully!');
+      setIsLoggingIn(false);
+      router.push('/user-dashboard');
+    } catch (err: any) {
+      console.error('Google login error:', {
+        message: err.message || 'Unknown error',
+        code: err.code || 'No code',
+        stack: err.stack || 'No stack trace',
+        details: JSON.stringify(err, null, 2),
+      });
+      const errorMap: Record<string, string> = {
+        'auth/popup-closed-by-user': 'Google sign-in was cancelled.',
+        'auth/too-many-requests': 'Too many sign-in attempts. Please try again later.',
+        'auth/invalid-api-key': 'Invalid Firebase API key. Please check your configuration.',
+      };
+      setError(errorMap[err.code] || `Failed to sign in with Google: ${err.message || 'Unknown error'}`);
       setIsLoggingIn(false);
     }
   };
@@ -90,34 +131,24 @@ export default function Login() {
       toast.success('Verification email resent. Please check your inbox and spam folder.', {
         duration: 5000,
       });
-    } catch (err) {
-      const error = err as FirebaseError;
-      console.error('Resend verification error:', error.message, { code: error.code, email });
+    } catch (err: any) {
+      console.error('Resend verification error:', {
+        message: err.message || 'Unknown error',
+        code: err.code || 'No code',
+        email,
+        stack: err.stack || 'No stack trace',
+        details: JSON.stringify(err, null, 2),
+      });
       const errorMap: Record<string, string> = {
         'auth/user-not-found': 'Invalid email or password.',
         'auth/wrong-password': 'Invalid email or password.',
         'auth/too-many-requests': 'Too many requests. Please try again later.',
+        'auth/invalid-api-key': 'Invalid Firebase API key. Please check your configuration.',
       };
-      setError(errorMap[error.code] || 'Failed to resend verification email. Please try again.');
+      setError(errorMap[err.code] || `Failed to resend verification email: ${err.message || 'Unknown error'}`);
     } finally {
       setIsResending(false);
       await auth.signOut();
-    }
-  };
-
-  const handleGoogleLogin = async () => {
-    setError('');
-    setIsLoggingIn(true);
-    try {
-      await signInWithPopup(auth, googleProvider);
-      toast.success('Signed in with Google successfully!');
-      setIsLoggingIn(false);
-      router.push('/user-dashboard');
-    } catch (err) {
-      const error = err as FirebaseError;
-      console.error('Google login error:', error.message, { code: error.code });
-      setError('Failed to sign in with Google. Please try again.');
-      setIsLoggingIn(false);
     }
   };
 

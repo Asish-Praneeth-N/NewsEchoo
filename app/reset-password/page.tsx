@@ -37,15 +37,21 @@ export default function ResetPassword() {
         duration: 5000,
       });
       setEmail('');
-    } catch (err) {
-      const error = err as FirebaseError;
-      console.error('Password reset error:', error.message, { code: error.code, email });
+    } catch (err: any) {
+      console.error('Password reset error:', {
+        message: err.message || 'Unknown error',
+        code: err.code || 'No code',
+        email,
+        stack: err.stack || 'No stack trace',
+        details: JSON.stringify(err, null, 2),
+      });
       const errorMap: Record<string, string> = {
         'auth/user-not-found': 'No account found with this email.',
         'auth/invalid-email': 'Invalid email format.',
         'auth/too-many-requests': 'Too many requests. Please try again later.',
+        'auth/invalid-api-key': 'Invalid Firebase API key. Please check your configuration.',
       };
-      setError(errorMap[error.code] || 'Failed to send password reset email. Please try again.');
+      setError(errorMap[err.code] || `Failed to send password reset email: ${err.message || 'Unknown error'}`);
     } finally {
       setIsSending(false);
     }

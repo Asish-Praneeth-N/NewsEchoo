@@ -1,9 +1,11 @@
+// context/AuthContext.tsx (unchanged)
+
 'use client';
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged, User } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, Timestamp } from "firebase/firestore";
 
 interface AuthContextType {
   user: User | null;
@@ -21,24 +23,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        await user.reload(); // Refresh user data
+        await user.reload(); // Refresh user data (e.g., emailVerified)
+        
+        const userDocRef = doc(db, "users", user.uid);
+        const userDoc = await getDoc(userDocRef);
+        
+        let userRole = userDoc.exists() ? userDoc.data().role : null;
+        
+        if (!userDoc.exists()) {
+          // Create the document if it doesn't exist, regardless of verification status
+          await setDoc(userDocRef, {
+            email: user.email,
+            role: "user",
+            createdAt: Timestamp.fromDate(new Date()),
+          });
+          userRole = "user";
+        }
+        
         if (user.emailVerified) {
+          // Only set role in context if verified
+          setRole(userRole);
           setUser(user);
-          const userDoc = await getDoc(doc(db, "users", user.uid));
-          if (userDoc.exists()) {
-            setRole(userDoc.data().role);
-          } else {
-            await setDoc(doc(db, "users", user.uid), {
-              uid: user.uid,
-              email: user.email,
-              role: "user",
-            });
-            setRole("user");
-          }
         } else {
-          setUser(null);
           setRole(null);
-          await auth.signOut(); // Sign out unverified users
+          setUser(null);
+          await auth.signOut(); // Sign out unverified users after document creation
         }
       } else {
         setUser(null);
