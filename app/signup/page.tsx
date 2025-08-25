@@ -68,9 +68,9 @@ export default function SignUp() {
 
       // Keep isSigningUp true during the 2-second delay (shows loader)
       setTimeout(() => {
-        setIsSigningUp(false);
         router.push('/verification-sent');
       }, 2000);
+      
     } catch (err) {
       console.error('Sign-up error:', {
         message: (err as Error).message || 'Unknown error',
