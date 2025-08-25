@@ -19,7 +19,7 @@ const navItems = [
 
 export default function Navigation() {
   const pathname = usePathname();
-  const { user, role, loading } = useAuth();
+  const { user, loading } = useAuth();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const router = useRouter();
 

@@ -1,5 +1,3 @@
-// app/signup/page.tsx (updated with LoadingSpinner integration)
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -12,7 +10,6 @@ import { useAuth } from '@/context/AuthContext';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import type { FirebaseError } from 'firebase/app';
 
 export default function SignUp() {
   const [email, setEmail] = useState('');
@@ -74,12 +71,12 @@ export default function SignUp() {
         setIsSigningUp(false);
         router.push('/verification-sent');
       }, 2000);
-    } catch (err: any) {
+    } catch (err) {
       console.error('Sign-up error:', {
-        message: err.message || 'Unknown error',
-        code: err.code || 'No code',
+        message: (err as Error).message || 'Unknown error',
+        code: (err as { code?: string }).code || 'No code',
         email,
-        stack: err.stack || 'No stack trace',
+        stack: (err as Error).stack || 'No stack trace',
         details: JSON.stringify(err, null, 2),
       });
 
@@ -93,10 +90,10 @@ export default function SignUp() {
         'firestore/permission-denied': 'Failed to save user data due to permission issues. Please contact support.',
       };
 
-      const errorMessage = errorMap[err.code] || `Failed to sign up: ${err.message || 'Unknown error'}`;
+      const errorMessage = errorMap[(err as { code: string }).code] || `Failed to sign up: ${(err as Error).message || 'Unknown error'}`;
       setError(errorMessage);
 
-      if (err.code !== 'auth/email-already-in-use') {
+      if ((err as { code: string }).code !== 'auth/email-already-in-use') {
         await auth.signOut();
       }
       setIsSigningUp(false);
@@ -107,14 +104,14 @@ export default function SignUp() {
     setError('');
     setIsSigningUp(true);
     try {
-      const userCredential = await signInWithPopup(auth, googleProvider);
+      await signInWithPopup(auth, googleProvider);
       toast.success('Signed up with Google successfully!');
       router.push('/user-dashboard');
-    } catch (err: any) {
+    } catch (err) {
       console.error('Google sign-up error:', {
-        message: err.message || 'Unknown error',
-        code: err.code || 'No code',
-        stack: err.stack || 'No stack trace',
+        message: (err as Error).message || 'Unknown error',
+        code: (err as { code?: string }).code || 'No code',
+        stack: (err as Error).stack || 'No stack trace',
         details: JSON.stringify(err, null, 2),
       });
       setError('Failed to sign up with Google. Please try again.');

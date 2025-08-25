@@ -11,7 +11,6 @@ import { useAuth } from '@/context/AuthContext';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import Link from 'next/link';
-import type { FirebaseError } from 'firebase/app';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -53,12 +52,12 @@ export default function Login() {
       toast.success('Logged in successfully!');
       setIsLoggingIn(false);
       router.push('/user-dashboard');
-    } catch (err: any) {
+    } catch (err) {
       console.error('Login error:', {
-        message: err.message || 'Unknown error',
-        code: err.code || 'No code',
+        message: (err as Error).message || 'Unknown error',
+        code: (err as { code?: string }).code || 'No code',
         email,
-        stack: err.stack || 'No stack trace',
+        stack: (err as Error).stack || 'No stack trace',
         details: JSON.stringify(err, null, 2),
       });
       const errorMap: Record<string, string> = {
@@ -68,7 +67,7 @@ export default function Login() {
         'auth/invalid-credential': 'Invalid credentials provided.',
         'auth/invalid-api-key': 'Invalid Firebase API key. Please check your configuration.',
       };
-      setError(errorMap[err.code] || `Failed to log in: ${err.message || 'Unknown error'}`);
+      setError(errorMap[(err as { code: string }).code] || `Failed to log in: ${(err as Error).message || 'Unknown error'}`);
       setIsLoggingIn(false);
     }
   };
@@ -91,11 +90,11 @@ export default function Login() {
       toast.success('Signed in with Google successfully!');
       setIsLoggingIn(false);
       router.push('/user-dashboard');
-    } catch (err: any) {
+    } catch (err) {
       console.error('Google login error:', {
-        message: err.message || 'Unknown error',
-        code: err.code || 'No code',
-        stack: err.stack || 'No stack trace',
+        message: (err as Error).message || 'Unknown error',
+        code: (err as { code?: string }).code || 'No code',
+        stack: (err as Error).stack || 'No stack trace',
         details: JSON.stringify(err, null, 2),
       });
       const errorMap: Record<string, string> = {
@@ -103,7 +102,7 @@ export default function Login() {
         'auth/too-many-requests': 'Too many sign-in attempts. Please try again later.',
         'auth/invalid-api-key': 'Invalid Firebase API key. Please check your configuration.',
       };
-      setError(errorMap[err.code] || `Failed to sign in with Google: ${err.message || 'Unknown error'}`);
+      setError(errorMap[(err as { code: string }).code] || `Failed to sign in with Google: ${(err as Error).message || 'Unknown error'}`);
       setIsLoggingIn(false);
     }
   };
@@ -131,12 +130,12 @@ export default function Login() {
       toast.success('Verification email resent. Please check your inbox and spam folder.', {
         duration: 5000,
       });
-    } catch (err: any) {
+    } catch (err) {
       console.error('Resend verification error:', {
-        message: err.message || 'Unknown error',
-        code: err.code || 'No code',
+        message: (err as Error).message || 'Unknown error',
+        code: (err as { code?: string }).code || 'No code',
         email,
-        stack: err.stack || 'No stack trace',
+        stack: (err as Error).stack || 'No stack trace',
         details: JSON.stringify(err, null, 2),
       });
       const errorMap: Record<string, string> = {
@@ -145,7 +144,7 @@ export default function Login() {
         'auth/too-many-requests': 'Too many requests. Please try again later.',
         'auth/invalid-api-key': 'Invalid Firebase API key. Please check your configuration.',
       };
-      setError(errorMap[err.code] || `Failed to resend verification email: ${err.message || 'Unknown error'}`);
+      setError(errorMap[(err as { code: string }).code] || `Failed to resend verification email: ${(err as Error).message || 'Unknown error'}`);
     } finally {
       setIsResending(false);
       await auth.signOut();

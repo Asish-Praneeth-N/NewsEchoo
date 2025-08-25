@@ -8,7 +8,6 @@ import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import type { FirebaseError } from 'firebase/app';
 
 export default function VerifyEmail() {
   const [error, setError] = useState('');
@@ -41,12 +40,12 @@ export default function VerifyEmail() {
           duration: 5000,
         });
         setTimeout(() => router.push('/login'), 3000);
-      } catch (err: any) {
+      } catch (err) {
         console.error('Verification error:', {
-          message: err.message || 'Unknown error',
-          code: err.code || 'No code',
+          message: (err as Error).message || 'Unknown error',
+          code: (err as { code?: string }).code || 'No code',
           oobCode,
-          stack: err.stack || 'No stack trace',
+          stack: (err as Error).stack || 'No stack trace',
           details: JSON.stringify(err, null, 2),
         });
         const errorMap: Record<string, string> = {
@@ -55,7 +54,7 @@ export default function VerifyEmail() {
           'auth/user-not-found': 'User not found. Please sign up again.',
           'auth/invalid-api-key': 'Invalid Firebase API key. Please check your configuration.',
         };
-        setError(errorMap[err.code] || `Failed to verify email: ${err.message || 'Unknown error'}`);
+        setError(errorMap[(err as { code: string }).code] || `Failed to verify email: ${(err as Error).message || 'Unknown error'}`);
       } finally {
         setIsVerifying(false);
       }
@@ -86,12 +85,12 @@ export default function VerifyEmail() {
       toast.success('Verification email resent. Please check your inbox and spam folder.', {
         duration: 5000,
       });
-    } catch (err: any) {
+    } catch (err) {
       console.error('Resend verification error:', {
-        message: err.message || 'Unknown error',
-        code: err.code || 'No code',
+        message: (err as Error).message || 'Unknown error',
+        code: (err as { code?: string }).code || 'No code',
         email,
-        stack: err.stack || 'No stack trace',
+        stack: (err as Error).stack || 'No stack trace',
         details: JSON.stringify(err, null, 2),
       });
       const errorMap: Record<string, string> = {
@@ -100,7 +99,7 @@ export default function VerifyEmail() {
         'auth/too-many-requests': 'Too many requests. Please try again later.',
         'auth/invalid-api-key': 'Invalid Firebase API key. Please check your configuration.',
       };
-      setError(errorMap[err.code] || `Failed to resend verification email: ${err.message || 'Unknown error'}`);
+      setError(errorMap[(err as { code: string }).code] || `Failed to resend verification email: ${(err as Error).message || 'Unknown error'}`);
     } finally {
       setIsResending(false);
       await auth.signOut();
