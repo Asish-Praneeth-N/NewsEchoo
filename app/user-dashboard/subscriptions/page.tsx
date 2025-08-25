@@ -15,8 +15,11 @@ import {
   deleteDoc,
   addDoc,
   where,
+  updateDoc,
+  increment,
+  deleteField,
 } from "firebase/firestore";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface Newsletter {
@@ -44,6 +47,7 @@ function SubscriptionCard({
   canUnsubscribe: boolean;
 }) {
   const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
 
   const handleUnsubscribe = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -58,10 +62,19 @@ function SubscriptionCard({
 
     setIsLoading(true);
     try {
-      await deleteDoc(
-        doc(db, "users", auth.currentUser!.uid, "subscriptions", newsletter.id)
-      );
+      const userRef = doc(db, "users", auth.currentUser!.uid);
+      await updateDoc(userRef, {
+        [`subscriptions.${newsletter.id}`]: deleteField(),
+      });
+      const updatedSnap = await getDoc(userRef);
+      const updatedData = updatedSnap.data();
+      if (!updatedData?.subscriptions || Object.keys(updatedData.subscriptions).length === 0) {
+        await updateDoc(userRef, { subscribed: false });
+      }
+      const nlRef = doc(db, "newsletters", newsletter.id);
+      await updateDoc(nlRef, { subscribers: increment(-1) });
       toast.success("Successfully unsubscribed!");
+      router.refresh();
     } catch (err: unknown) {
       const error = err instanceof Error ? err : new Error("Unknown error");
       console.error("Unsubscribe error:", error);
@@ -173,6 +186,7 @@ function SubscriptionsContent() {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const searchParams = useSearchParams();
   const newsletterId = searchParams.get("newsletterId");
+  const router = useRouter();
 
   const fetchSubscriberCount = async (newsletterId: string): Promise<number> => {
     try {
@@ -216,26 +230,29 @@ function SubscriptionsContent() {
       if (!user || isAdmin === null) return;
       setIsLoading(true);
       try {
-        const subscriptionsQuery = query(
-          collection(db, "users", user.uid, "subscriptions")
-        );
-        const subscriptionsSnap = await getDocs(subscriptionsQuery);
-        console.log(`Found ${subscriptionsSnap.docs.length} subscriptions for user ${user.uid}`);
-        const subscriptionPromises = subscriptionsSnap.docs.map(
-          async (subDoc) => {
+        const userRef = doc(db, "users", user.uid);
+        const userSnap = await getDoc(userRef);
+        if (!userSnap.exists()) {
+          throw new Error("User not found");
+        }
+        const userData = userSnap.data();
+        const subs = userData.subscriptions || {};
+        console.log(`Found ${Object.keys(subs).length} subscriptions for user ${user.uid}`);
+        const subscriptionPromises = Object.keys(subs).map(
+          async (id) => {
             try {
               const newsletterDoc = await getDoc(
-                doc(db, "newsletters", subDoc.id)
+                doc(db, "newsletters", id)
               );
               if (newsletterDoc.exists()) {
                 const data = newsletterDoc.data();
                 if (!data.status || data.status !== "published") {
                   console.warn(
-                    `Skipping newsletter ${subDoc.id}: status is ${data.status || 'missing'}`
+                    `Skipping newsletter ${id}: status is ${data.status || 'missing'}`
                   );
                   return null;
                 }
-                const subscriberCount = isAdmin === true ? await fetchSubscriberCount(subDoc.id) : 0;
+                const subscriberCount = isAdmin === true ? await fetchSubscriberCount(id) : data.subscribers || 0;
                 return {
                   id: newsletterDoc.id,
                   title: data.title || "Untitled",
@@ -249,14 +266,14 @@ function SubscriptionsContent() {
                     new Date().toISOString(),
                   content: data.content || "No content available.",
                   subscribedAt:
-                    subDoc.data().subscribedAt?.toDate() || new Date(),
+                    subs[id].subscribedAt?.toDate() || new Date(),
                 } as Newsletter;
               } else {
-                console.warn(`Newsletter ${subDoc.id} does not exist`);
+                console.warn(`Newsletter ${id} does not exist`);
                 return null;
               }
             } catch (err: unknown) {
-              console.error(`Error fetching newsletter ${subDoc.id}:`, err);
+              console.error(`Error fetching newsletter ${id}:`, err);
               return null;
             }
           }
@@ -266,7 +283,7 @@ function SubscriptionsContent() {
         );
         console.log(`Loaded ${newsletters.length} valid newsletters`);
         setSubscriptions(newsletters);
-        if (newsletters.length === 0 && subscriptionsSnap.docs.length > 0) {
+        if (newsletters.length === 0 && Object.keys(subs).length > 0) {
           toast.error(
             "No accessible newsletters found. Some subscriptions may reference unpublished or deleted newsletters."
           );
@@ -295,7 +312,7 @@ function SubscriptionsContent() {
             toast.error("Selected newsletter is not accessible");
             return;
           }
-          const subscriberCount = isAdmin === true ? await fetchSubscriberCount(newsletterId) : 0;
+          const subscriberCount = isAdmin === true ? await fetchSubscriberCount(newsletterId) : data.subscribers || 0;
           const newsletter: Newsletter = {
             id: newsletterDoc.id,
             title: data.title || "Untitled",
@@ -311,11 +328,11 @@ function SubscriptionsContent() {
             subscribedAt: user
               ? (
                   await getDoc(
-                    doc(db, "users", user.uid, "subscriptions", newsletterId)
+                    doc(db, "users", user.uid)
                   )
                 )
                   .data()
-                  ?.subscribedAt?.toDate()
+                  ?.subscriptions?.[newsletterId]?.subscribedAt?.toDate()
               : undefined,
           };
           setSelectedNewsletter(newsletter);

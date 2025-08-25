@@ -13,8 +13,9 @@ import {
   where,
   doc,
   getDoc,
-  setDoc,
-  deleteDoc,
+  updateDoc,
+  increment,
+  deleteField,
 } from "firebase/firestore";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
@@ -44,28 +45,45 @@ function NewsletterCard({ newsletter }: { newsletter: Newsletter }) {
     }
     setIsSubmitting(true);
     try {
-      const subscriptionRef = doc(
-        db,
-        "users",
-        user.uid,
-        "subscriptions",
-        newsletter.id
-      );
+      const userRef = doc(db, "users", user.uid);
+      const userSnap = await getDoc(userRef);
+      if (!userSnap.exists()) {
+        toast.error("User data not found");
+        return;
+      }
+      const userData = userSnap.data();
+      const currentSubs = userData.subscriptions || {};
       if (newsletter.isSubscribed) {
+        const subInfo = currentSubs[newsletter.id];
         if (
-          !newsletter.subscribedAt ||
-          (Date.now() - newsletter.subscribedAt.getTime()) /
-            (1000 * 60 * 60 * 24) <= 1
+          !subInfo ||
+          !subInfo.subscribedAt ||
+          (Date.now() - new Date(subInfo.subscribedAt).getTime()) / (1000 * 60 * 60) < 24
         ) {
           toast.error("You cannot unsubscribe for 24 hours after subscribing.");
-          setIsSubmitting(false);
           return;
         }
-        await deleteDoc(subscriptionRef);
+        await updateDoc(userRef, {
+          [`subscriptions.${newsletter.id}`]: deleteField(),
+        });
+        const remaining = Object.keys(currentSubs).length - 1;
+        if (remaining <= 0) {
+          await updateDoc(userRef, { subscribed: false });
+        }
+        const nlRef = doc(db, "newsletters", newsletter.id);
+        await updateDoc(nlRef, { subscribers: increment(-1) });
         toast.success("Successfully unsubscribed!");
         newsletter.isSubscribed = false;
       } else {
-        await setDoc(subscriptionRef, { subscribedAt: new Date() });
+        await updateDoc(userRef, {
+          [`subscriptions.${newsletter.id}`]: { subscribedAt: new Date() },
+          subscribed: true,
+        });
+        if (Object.keys(currentSubs).length === 0) {
+          await updateDoc(userRef, { subscribedAt: new Date() });
+        }
+        const nlRef = doc(db, "newsletters", newsletter.id);
+        await updateDoc(nlRef, { subscribers: increment(1) });
         toast.success("Successfully subscribed!");
         newsletter.isSubscribed = true;
         router.push(
@@ -213,7 +231,8 @@ export default function NewslettersPage() {
 
         const newslettersData: Newsletter[] = await Promise.all(
           newslettersSnap.docs.map(async (doc) => {
-            let subscriberCount = 0;
+            const data = doc.data();
+            let subscriberCount = data.subscribers || 0;
             if (isAdmin) {
               try {
                 const subscriptionsQuery = query(
@@ -228,14 +247,14 @@ export default function NewslettersPage() {
             }
             return {
               id: doc.id,
-              title: doc.data().title || "Untitled",
-              description: doc.data().description || "",
-              imageUrl: doc.data().imageUrl || null,
-              category: doc.data().category || "General",
-              author: doc.data().author || "Unknown",
+              title: data.title || "Untitled",
+              description: data.description || "",
+              imageUrl: data.imageUrl || null,
+              category: data.category || "General",
+              author: data.author || "Unknown",
               subscriberCount,
               publishedAt:
-                (doc.data().publishedAt || doc.data().date)?.toDate().toISOString() ||
+                (data.publishedAt || data.date)?.toDate().toISOString() ||
                 new Date().toISOString(),
               isSubscribed: false,
               subscribedAt: undefined,
@@ -244,17 +263,13 @@ export default function NewslettersPage() {
         );
 
         if (user) {
-          const subscriptionsQuery = query(
-            collection(db, "users", user.uid, "subscriptions")
-          );
-          const subscriptionsSnap = await getDocs(subscriptionsQuery);
-          console.log(`Found ${subscriptionsSnap.docs.length} subscriptions for user ${user.uid}`);
-          subscriptionsSnap.forEach((subDoc) => {
-            const newsletter = newslettersData.find((n) => n.id === subDoc.id);
-            if (newsletter) {
-              newsletter.isSubscribed = true;
-              newsletter.subscribedAt =
-                subDoc.data().subscribedAt?.toDate() || new Date();
+          const userSnap = await getDoc(doc(db, "users", user.uid));
+          const userData = userSnap.data();
+          newslettersData.forEach((n) => {
+            const subInfo = userData?.subscriptions?.[n.id];
+            if (subInfo) {
+              n.isSubscribed = true;
+              n.subscribedAt = subInfo.subscribedAt?.toDate();
             }
           });
         }

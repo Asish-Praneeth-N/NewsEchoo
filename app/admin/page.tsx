@@ -30,25 +30,43 @@ export default function AdminDashboard() {
     const fetchDashboardData = async () => {
       try {
         const today = new Date();
-        const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(today.getDate() - 7);
-        const fourteenDaysAgo = new Date();
-        fourteenDaysAgo.setDate(today.getDate() - 14);
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(today.getDate() - 30);
+        today.setHours(23, 59, 59, 999); // End of today
 
-        // Fetch newsletters
-        const newslettersSnapshot = await getDocs(collection(db, 'newsletters'));
+        const sevenDaysAgo = new Date(today);
+        sevenDaysAgo.setDate(today.getDate() - 7);
+        sevenDaysAgo.setHours(0, 0, 0, 0);
+
+        const fourteenDaysAgo = new Date(today);
+        fourteenDaysAgo.setDate(today.getDate() - 14);
+        fourteenDaysAgo.setHours(0, 0, 0, 0);
+
+        const thirtyDaysAgo = new Date(today);
+        thirtyDaysAgo.setDate(today.getDate() - 30);
+        thirtyDaysAgo.setHours(0, 0, 0, 0);
+
+        // Fetch newsletters (only published)
+        const newslettersSnapshot = await getDocs(
+          query(collection(db, 'newsletters'), where('status', '==', 'published'))
+        );
         setTotalNewsletters(newslettersSnapshot.size);
 
+        // Newsletters published in the last 7 days
         const currentNewsletters = await getDocs(
-          query(collection(db, 'newsletters'), where('date', '>=', sevenDaysAgo))
+          query(
+            collection(db, 'newsletters'),
+            where('status', '==', 'published'),
+            where('publishedAt', '>=', sevenDaysAgo),
+            where('publishedAt', '<=', today)
+          )
         );
+
+        // Newsletters published in the 7 days before that
         const previousNewsletters = await getDocs(
           query(
             collection(db, 'newsletters'),
-            where('date', '>=', fourteenDaysAgo),
-            where('date', '<', sevenDaysAgo)
+            where('status', '==', 'published'),
+            where('publishedAt', '>=', fourteenDaysAgo),
+            where('publishedAt', '<', sevenDaysAgo)
           )
         );
 
@@ -56,61 +74,79 @@ export default function AdminDashboard() {
         const previousNewsletterCount = previousNewsletters.size;
         const newsletterGrowth =
           previousNewsletterCount === 0
-            ? 0
+            ? (currentNewsletterCount > 0 ? 100 : 0)
             : ((currentNewsletterCount - previousNewsletterCount) / previousNewsletterCount) * 100;
         setNewsletterGrowth(Math.round(newsletterGrowth * 10) / 10);
 
-        // Active Subscribers
-        const usersSnapshot = await getDocs(query(collection(db, 'users'), where('role', '==', 'user')));
+        // Active Subscribers (users with subscribed == true)
+        const usersSnapshot = await getDocs(
+          query(collection(db, 'users'), where('role', '==', 'user'), where('subscribed', '==', true))
+        );
         setActiveSubscribers(usersSnapshot.size);
 
+        // New active subscribers this period
         const currentSubscribers = await getDocs(
           query(
             collection(db, 'users'),
             where('role', '==', 'user'),
-            where('createdAt', '>=', sevenDaysAgo)
+            where('subscribed', '==', true),
+            where('createdAt', '>=', sevenDaysAgo),
+            where('createdAt', '<=', today)
           )
         );
+
+        // Active subscribers in previous period
         const previousSubscribers = await getDocs(
           query(
             collection(db, 'users'),
             where('role', '==', 'user'),
+            where('subscribed', '==', true),
             where('createdAt', '>=', fourteenDaysAgo),
             where('createdAt', '<', sevenDaysAgo)
           )
         );
+
         const currentSubscriberCount = currentSubscribers.size;
         const previousSubscriberCount = previousSubscribers.size;
         const subscriberGrowth =
           previousSubscriberCount === 0
-            ? 0
+            ? (currentSubscriberCount > 0 ? 100 : 0)
             : ((currentSubscriberCount - previousSubscriberCount) / previousSubscriberCount) * 100;
         setSubscriberGrowth(Math.round(subscriberGrowth * 10) / 10);
 
-        // Total Replies
-        const totalReplies = newslettersSnapshot.docs.reduce(
-          (sum, doc) => sum + (doc.data().replies || 0),
-          0
-        );
-        setTotalReplies(totalReplies);
+        // Total Replies (count of all replies)
+        const repliesSnapshot = await getDocs(collection(db, 'replies'));
+        setTotalReplies(repliesSnapshot.size);
 
-        const currentReplies = currentNewsletters.docs.reduce(
-          (sum, doc) => sum + (doc.data().replies || 0),
-          0
+        // Replies in current period (last 7 days)
+        const currentRepliesQ = query(
+          collection(db, 'replies'),
+          where('createdAt', '>=', sevenDaysAgo),
+          where('createdAt', '<=', today)
         );
-        const previousReplies = previousNewsletters.docs.reduce(
-          (sum, doc) => sum + (doc.data().replies || 0),
-          0
+        const currentRepliesSnapshot = await getDocs(currentRepliesQ);
+        const currentReplies = currentRepliesSnapshot.size;
+
+        // Replies in previous period (7 days before current)
+        const previousRepliesQ = query(
+          collection(db, 'replies'),
+          where('createdAt', '>=', fourteenDaysAgo),
+          where('createdAt', '<', sevenDaysAgo)
         );
+        const previousRepliesSnapshot = await getDocs(previousRepliesQ);
+        const previousReplies = previousRepliesSnapshot.size;
+
         const repliesGrowth =
-          previousReplies === 0 ? 0 : ((currentReplies - previousReplies) / previousReplies) * 100;
+          previousReplies === 0
+            ? (currentReplies > 0 ? 100 : 0)
+            : ((currentReplies - previousReplies) / previousReplies) * 100;
         setRepliesGrowth(Math.round(repliesGrowth * 10) / 10);
 
         // Last Published Newsletter
         const lastPublishedQuery = query(
           collection(db, 'newsletters'),
           where('status', '==', 'published'),
-          orderBy('date', 'desc'),
+          orderBy('publishedAt', 'desc'),
           limit(1)
         );
         const lastPublishedSnapshot = await getDocs(lastPublishedQuery);
@@ -118,23 +154,33 @@ export default function AdminDashboard() {
           const data = lastPublishedSnapshot.docs[0].data();
           setLastPublished({
             title: data.title || 'Untitled',
-            date: data.date?.toDate?.() || new Date(),
+            date: data.publishedAt?.toDate?.() || new Date(),
           });
         }
 
-        // Recent Newsletters
-        const recentQuery = query(collection(db, 'newsletters'), orderBy('date', 'desc'), limit(3));
+        // Recent Newsletters (latest 3 published)
+        const recentQuery = query(
+          collection(db, 'newsletters'),
+          where('status', '==', 'published'),
+          orderBy('publishedAt', 'desc'),
+          limit(3)
+        );
         const recentSnapshot = await getDocs(recentQuery);
+
+        // For each newsletter, count replies related to it
         const recentNewslettersData: Newsletter[] = recentSnapshot.docs
-          .filter((doc) => doc.data().date)
+          .filter((doc) => doc.data().publishedAt)
           .map((doc) => {
             const data = doc.data();
+            const newsletterReplies = repliesSnapshot.docs.filter(
+              (replyDoc) => replyDoc.data().newsletterId === doc.id
+            ).length;
             return {
               id: doc.id,
               title: data.title || 'Untitled',
-              date: data.date.toDate?.() || new Date(),
+              date: data.publishedAt.toDate?.() || new Date(),
               status: data.status || 'draft',
-              replies: data.replies || 0,
+              replies: newsletterReplies,
               subscribers: data.subscribers || 0,
               imageUrl: data.imageUrl,
               content: data.content || '',
@@ -142,30 +188,33 @@ export default function AdminDashboard() {
           });
         setRecentNewsletters(recentNewslettersData);
 
-        // Engagement Data (last 7 days)
+        // Engagement Data: new subscribers in last 30 days, grouped by day for last 7 days
         const engagementQuery = query(
-          collection(db, 'newsletters'),
-          where('date', '>=', thirtyDaysAgo),
-          orderBy('date', 'asc')
+          collection(db, 'users'),
+          where('role', '==', 'user'),
+          where('subscribed', '==', true),
+          where('createdAt', '>=', thirtyDaysAgo),
+          orderBy('createdAt', 'asc')
         );
         const engagementSnapshot = await getDocs(engagementQuery);
 
-        const last7Days = Array.from({ length: 7 }).map((_, i) => {
+        const last7Days = Array.from({ length: 7 }, (_, i) => {
           const date = new Date();
           date.setDate(date.getDate() - (6 - i));
-          const replies = engagementSnapshot.docs
-            .filter((doc) => {
-              const docDate = doc.data().date?.toDate?.();
-              return docDate && docDate.toDateString() === date.toDateString();
-            })
-            .reduce((sum, doc) => sum + (doc.data().replies || 0), 0);
-          return replies;
+          date.setHours(0, 0, 0, 0);
+          const nextDate = new Date(date);
+          nextDate.setDate(nextDate.getDate() + 1);
+          const subscribersOnDay = engagementSnapshot.docs.filter((doc) => {
+            const docDate = doc.data().createdAt?.toDate?.();
+            return docDate && docDate >= date && docDate < nextDate;
+          }).length;
+          return subscribersOnDay;
         });
         setEngagementData(last7Days);
 
         const early = last7Days.slice(0, 3).reduce((a, b) => a + b, 0);
         const recent = last7Days.slice(4, 7).reduce((a, b) => a + b, 0);
-        const growth = early === 0 ? 0 : ((recent - early) / early) * 100;
+        const growth = early === 0 ? (recent > 0 ? 100 : 0) : ((recent - early) / early) * 100;
         setGrowthPercentage(Math.round(growth * 10) / 10);
       } catch (err: unknown) {
         const error = err instanceof Error ? err : new Error('Unknown error');
@@ -186,11 +235,9 @@ export default function AdminDashboard() {
     <AdminLayout>
       <div className="space-y-8">
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
-          <h1 className="text-3xl font-playfair font-bold text-black dark:text-white">
-            Dashboard Overview
-          </h1>
+          <h1 className="text-3xl font-playfair font-bold text-black dark:text-white">Dashboard Overview</h1>
           <p className="mt-2 text-gray-600 dark:text-gray-300">
-            Welcome back! Here&apos;s what&apos;s happening with your newsletter platform.
+            Welcome back! Here's what's happening with your newsletter platform.
           </p>
         </motion.div>
 
@@ -242,19 +289,19 @@ export default function AdminDashboard() {
           className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-300 dark:border-gray-600 p-6"
         >
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-playfair font-semibold text-black dark:text-white">
-              Recent Engagement
-            </h2>
+            <h2 className="text-xl font-playfair font-semibold text-black dark:text-white">Recent Engagement</h2>
             <span
               className={`text-sm ${
                 growthPercentage >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
               }`}
             >
-              {growthPercentage >= 0 ? '+' : ''}{growthPercentage}% growth
+              {growthPercentage >= 0 ? '+' : ''}
+              {growthPercentage}% growth
             </span>
           </div>
           <p className="text-gray-600 dark:text-gray-300 mb-4">
-            Newsletter performance from {sevenDaysAgo.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })} to Today
+            Newsletter performance from{' '}
+            {sevenDaysAgo.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })} to Today
           </p>
 
           {loading ? (
@@ -270,7 +317,7 @@ export default function AdminDashboard() {
                 <motion.div
                   key={i}
                   initial={{ height: 0 }}
-                  animate={{ height: `${Math.min(value * 3 + 20, 100)}%` }}
+                  animate={{ height: `${Math.min(value * 10 + 10, 100)}%` }} // adjusted scaling for better visibility
                   transition={{ duration: 0.4, delay: i * 0.05 }}
                   className="flex-1 bg-gradient-to-t from-sky-600 to-sky-400 dark:from-emerald-600 dark:to-emerald-400 rounded-t"
                 />
@@ -291,9 +338,7 @@ export default function AdminDashboard() {
           className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-300 dark:border-gray-600 p-6"
         >
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-playfair font-semibold text-black dark:text-white">
-              Recent Newsletters
-            </h2>
+            <h2 className="text-xl font-playfair font-semibold text-black dark:text-white">Recent Newsletters</h2>
             <button
               onClick={() => router.push('/admin/newsletters')}
               className="text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white"
